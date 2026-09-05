@@ -29,6 +29,8 @@ The major differences include:
 | `sensor.<device>_supply_temperature` etc. | The four heat-exchanger temperatures |
 | `sensor.<device>_humidity` | Extract air humidity, if the unit has the sensor |
 | `sensor.<device>_supply_fan_speed` | Fan speeds, air pressures and the filter countdown |
+| `binary_sensor.<device>_alarm` | Whether the unit is reporting a fault |
+| `binary_sensor.<device>_filter` | Whether the filter needs attention |
 | `switch.<device>_boost_mode` | Boost |
 | `switch.<device>_timer_mode` | Main timer |
 | `switch.<device>_schedule_mode` | Weekly schedule |
@@ -76,6 +78,27 @@ A few notes on hardware that is not always fitted:
 - The air pressure sensors read a constant `0` unless the optional pressure
   sensors are installed. Pascals is assumed, as the conventional unit for
   ventilation static pressure; the registers themselves do not state a unit.
+
+### Alarm and filter status
+
+Two problem binary sensors report whether the unit wants attention:
+
+| Binary sensor | On when |
+| --- | --- |
+| Alarm | The unit is reporting a fault or warning |
+| Filter | The filter needs cleaning or replacing |
+
+Both underlying registers hold more than two values, and no documentation of what
+each value means could be found. Only the "nothing to report" value is certain —
+zero, in both cases — so these are exposed as simple problem flags, and each one
+keeps the raw register in its attributes so the detail is not lost:
+
+- `binary_sensor.<device>_alarm` has `alarm_state` (the raw register) and
+  `alarm_codes` (the individual codes decoded from the unit's alarm bits).
+- `binary_sensor.<device>_filter` has `filter_state` and `days_remaining`.
+
+Use `blauberg_s21_ext.reset_alarm` and `blauberg_s21_ext.reset_filter_change_timer`,
+or the corresponding buttons, to clear them once the cause is dealt with.
 
 
 ## Installation and Configuration

@@ -132,6 +132,7 @@ def _build() -> None:  # noqa: PLR0915 - one flat builder is easiest to read
 
     class Platform:
         CLIMATE = "climate"
+        BINARY_SENSOR = "binary_sensor"
         BUTTON = "button"
         NUMBER = "number"
         SELECT = "select"
@@ -825,3 +826,37 @@ def _build() -> None:  # noqa: PLR0915 - one flat builder is easiest to read
     number.NumberEntity = NumberEntity
     number.NumberEntityDescription = NumberEntityDescription
     number.NumberMode = NumberMode
+
+    # binary_sensor
+    binary_sensor = _module("homeassistant.components.binary_sensor")
+
+    class BinarySensorDeviceClass(str):
+        PROBLEM = "problem"
+        SAFETY = "safety"
+        RUNNING = "running"
+        CONNECTIVITY = "connectivity"
+
+    @dataclass(frozen=True, kw_only=True)
+    class BinarySensorEntityDescription(EntityDescription):
+        pass
+
+    class BinarySensorEntity(Entity):
+        _attr_is_on: bool | None = None
+
+        @property
+        def device_class(self):
+            return self._described("device_class")
+
+        @property
+        def is_on(self) -> bool | None:
+            return self._attr_is_on
+
+        @property
+        def state(self):
+            if self.is_on is None:
+                return None
+            return "on" if self.is_on else "off"
+
+    binary_sensor.BinarySensorDeviceClass = BinarySensorDeviceClass
+    binary_sensor.BinarySensorEntity = BinarySensorEntity
+    binary_sensor.BinarySensorEntityDescription = BinarySensorEntityDescription

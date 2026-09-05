@@ -47,6 +47,8 @@ REQUIRED_KEYS = (
     "entity.sensor.s21_supply_temperature.name",
     "entity.sensor.s21_extract_temperature.name",
     "entity.sensor.s21_extract_outlet_temperature.name",
+    "entity.binary_sensor.s21_alarm.name",
+    "entity.binary_sensor.s21_filter.name",
     "services.reset_filter_change_timer.name",
     "services.reset_filter_change_timer.description",
     "services.reset_alarm.name",
@@ -222,12 +224,16 @@ def test_bypass_select_options_match_the_translations(component_dir):
 
 def test_every_sensor_has_a_translated_name(component_dir):
     """Each sensor description's translation key must exist in every language."""
-    from blauberg_s21_ext.sensor import TEMPERATURE_SENSORS
+    from blauberg_s21_ext.binary_sensor import BINARY_SENSORS
+    from blauberg_s21_ext.sensor import SENSORS
 
+    wanted = [("sensor", d) for d in SENSORS] + [
+        ("binary_sensor", d) for d in BINARY_SENSORS
+    ]
     for path in LANGUAGE_FILES:
         flat = flatten(json.loads(path.read_text(encoding="utf-8")))
-        for description in TEMPERATURE_SENSORS:
-            key = f"entity.sensor.{description.translation_key}.name"
+        for platform, description in wanted:
+            key = f"entity.{platform}.{description.translation_key}.name"
             assert key in flat, f"{path.name} is missing {key}"
 
 

@@ -19,24 +19,13 @@ pytestmark = [pytest.mark.asyncio, requires_hass_stub]
 
 def all_platforms():
     """Every platform module, in the order Home Assistant sets them up."""
-    from blauberg_s21_ext import (
-        button as button_platform,
-    )
-    from blauberg_s21_ext import (
-        climate as climate_platform,
-    )
-    from blauberg_s21_ext import (
-        number as number_platform,
-    )
-    from blauberg_s21_ext import (
-        select as select_platform,
-    )
-    from blauberg_s21_ext import (
-        sensor as sensor_platform,
-    )
-    from blauberg_s21_ext import (
-        switch as switch_platform,
-    )
+    from blauberg_s21_ext import binary_sensor as binary_sensor_platform
+    from blauberg_s21_ext import button as button_platform
+    from blauberg_s21_ext import climate as climate_platform
+    from blauberg_s21_ext import number as number_platform
+    from blauberg_s21_ext import select as select_platform
+    from blauberg_s21_ext import sensor as sensor_platform
+    from blauberg_s21_ext import switch as switch_platform
 
     return (
         climate_platform,
@@ -45,6 +34,7 @@ def all_platforms():
         select_platform,
         sensor_platform,
         number_platform,
+        binary_sensor_platform,
     )
 
 
@@ -99,6 +89,7 @@ async def test_setup_stores_runtime_data_and_forwards_platforms(loaded):
     assert len(forwarded) == 1
     assert set(forwarded[0][1]) == {
         "climate",
+        "binary_sensor",
         "button",
         "number",
         "select",
@@ -335,6 +326,8 @@ async def test_entity_unique_ids_are_unchanged(loaded, add_entities):
         f"{base}_supply_pressure",
         f"{base}_extract_pressure",
         f"{base}_filter_countdown",
+        f"{base}_alarm",
+        f"{base}_filter",
     }
 
     entities = []
@@ -384,7 +377,7 @@ async def test_entity_names_come_from_the_translations(loaded, add_entities):
             continue
         others.extend(await add_entities(platform, hass, entry))
 
-    assert len(others) == 17
+    assert len(others) == 19
     for entity in others:
         assert entity.has_entity_name is True
         assert entity.translation_key is not None
@@ -1170,6 +1163,150 @@ async def test_manual_fan_speed_survives_a_custom_mode_round_trip(
     assert climate.fan_mode == "custom"
     assert slider.native_value == 42
     assert slider.extra_state_attributes["active"] is True
+
+
+# ------------------------------------------------------------ status flags
+async def test_status_binary_sensors_are_created(loaded, add_entities):
+    from blauberg_s21_ext import binary_sensor as binary_sensor_platform
+
+    hass, entry, _data = loaded
+    flags = await add_entities(binary_sensor_platform, hass, entry)
+
+    assert {flag.entity_description.key for flag in flags} == {"alarm", "filter"}
+    for flag in flags:
+        assert flag.device_class == "problem"
+
+
+async def test_status_flags_are_off_on_a_healthy_unit(loaded, add_entities):
+    from blauberg_s21_ext import binary_sensor as binary_sensor_platform
+
+    hass, entry, _data = loaded
+    flags = {
+        flag.entity_description.key: flag
+        for flag in await add_entities(binary_sensor_platform, hass, entry)
+    }
+
+    # Fake server defaults: IR_ALARM 0, IR_StateFILTER 0
+    assert flags["alarm"].is_on is False
+    assert flags["filter"].is_on is False
+
+
+@pytest.mark.parametrize("raw", [1, 2, 3, 255])
+async def test_alarm_flag_raises_for_any_non_zero_state(
+    loaded, fake_server, add_entities, raw
+):
+    """Zero is the only value known to mean "nothing wrong"."""
+    from blauberg_s21_ext import binary_sensor as binary_sensor_platform
+
+    hass, entry, data = loaded
+    alarm = {
+        flag.entity_description.key: flag
+        for flag in await add_entities(binary_sensor_platform, hass, entry)
+    }["alarm"]
+
+    fake_server.inputs[38] = raw  # IR_ALARM
+    await data.coordinator.async_refresh()
+
+    assert alarm.is_on is True
+    assert alarm.extra_state_attributes["alarm_state"] == raw
+
+
+@pytest.mark.parametrize("raw", [1, 2, 3])
+async def test_filter_flag_raises_for_any_non_zero_state(
+    loaded, fake_server, add_entities, raw
+):
+    from blauberg_s21_ext import binary_sensor as binary_sensor_platform
+
+    hass, entry, data = loaded
+    filter_flag = {
+        flag.entity_description.key: flag
+        for flag in await add_entities(binary_sensor_platform, hass, entry)
+    }["filter"]
+
+    fake_server.inputs[31] = raw  # IR_StateFILTER
+    await data.coordinator.async_refresh()
+
+    assert filter_flag.is_on is True
+    assert filter_flag.extra_state_attributes["filter_state"] == raw
+
+
+async def test_alarm_flag_exposes_the_decoded_codes(loaded, fake_server, add_entities):
+    """"on" collapses several states, so the detail must stay reachable."""
+    from blauberg_s21_ext import binary_sensor as binary_sensor_platform
+
+    hass, entry, data = loaded
+    alarm = {
+        flag.entity_description.key: flag
+        for flag in await add_entities(binary_sensor_platform, hass, entry)
+    }["alarm"]
+
+    assert alarm.extra_state_attributes["alarm_codes"] == []
+
+    fake_server.inputs[38] = 2
+    fake_server.discrete[19 + 23] = True
+    fake_server.discrete[19 + 7] = True
+    await data.coordinator.async_refresh()
+
+    attributes = alarm.extra_state_attributes
+    assert attributes["alarm_state"] == 2
+    assert attributes["alarm_codes"] == [7, 23]
+
+
+async def test_filter_flag_exposes_the_days_remaining(
+    loaded, fake_server, add_entities
+):
+    from blauberg_s21_ext import binary_sensor as binary_sensor_platform
+
+    hass, entry, data = loaded
+    filter_flag = {
+        flag.entity_description.key: flag
+        for flag in await add_entities(binary_sensor_platform, hass, entry)
+    }["filter"]
+
+    fake_server.inputs[28] = 3  # IR_CurFILTER_TIMER
+    fake_server.inputs[31] = 1  # IR_StateFILTER
+    await data.coordinator.async_refresh()
+
+    attributes = filter_flag.extra_state_attributes
+    assert attributes["days_remaining"] == 3
+    assert attributes["filter_state"] == 1
+
+
+async def test_status_flags_clear_again(loaded, fake_server, add_entities):
+    from blauberg_s21_ext import binary_sensor as binary_sensor_platform
+
+    hass, entry, data = loaded
+    flags = {
+        flag.entity_description.key: flag
+        for flag in await add_entities(binary_sensor_platform, hass, entry)
+    }
+
+    fake_server.inputs[38] = 2
+    fake_server.inputs[31] = 1
+    await data.coordinator.async_refresh()
+    assert flags["alarm"].is_on is True
+    assert flags["filter"].is_on is True
+
+    fake_server.inputs[38] = 0
+    fake_server.inputs[31] = 0
+    await data.coordinator.async_refresh()
+    assert flags["alarm"].is_on is False
+    assert flags["filter"].is_on is False
+
+
+async def test_status_flags_go_unavailable_with_the_device(
+    loaded, fake_server, add_entities
+):
+    from blauberg_s21_ext import binary_sensor as binary_sensor_platform
+
+    hass, entry, data = loaded
+    flags = await add_entities(binary_sensor_platform, hass, entry)
+    assert all(flag.available for flag in flags)
+
+    fake_server.fault = Fault.REFUSE_CONNECTIONS
+    for _ in range(4):
+        await data.coordinator.async_refresh()
+    assert not any(flag.available for flag in flags)
 
 
 # ------------------------------------------------------------- config flow

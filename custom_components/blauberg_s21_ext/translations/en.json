@@ -26,6 +26,22 @@
         }
     },
     "entity": {
+        "binary_sensor": {
+            "s21_alarm": {
+                "name": "Alarm"
+            },
+            "s21_filter": {
+                "name": "Filter"
+            }
+        },
+        "button": {
+            "blauberg_s21_reset_filter": {
+                "name": "Reset filter timer"
+            },
+            "blauberg_s21_reset_alarm": {
+                "name": "Reset alarm state"
+            }
+        },
         "climate": {
             "s21climate": {
                 "state_attributes": {
@@ -37,23 +53,9 @@
                 }
             }
         },
-        "button": {
-            "blauberg_s21_reset_filter": {
-                "name": "Reset filter timer"
-            },
-            "blauberg_s21_reset_alarm": {
-                "name": "Reset alarm state"
-            }
-        },
-        "switch": {
-            "blauberg_s21_boost_switch": {
-                "name": "Boost mode"
-            },
-            "blauberg_s21_timer_switch": {
-                "name": "Timer mode"
-            },
-            "blauberg_s21_schedule_mode_switch": {
-                "name": "Schedule mode"
+        "number": {
+            "s21manualfanspeed": {
+                "name": "Manual fan speed"
             }
         },
         "select": {
@@ -64,11 +66,6 @@
                     "open": "Bypass opened / rotor stopped",
                     "auto": "Automatic mode"
                 }
-            }
-        },
-        "number": {
-            "s21manualfanspeed": {
-                "name": "Manual fan speed"
             }
         },
         "sensor": {
@@ -101,6 +98,17 @@
             },
             "s21_filter_countdown": {
                 "name": "Filter time remaining"
+            }
+        },
+        "switch": {
+            "blauberg_s21_boost_switch": {
+                "name": "Boost mode"
+            },
+            "blauberg_s21_timer_switch": {
+                "name": "Timer mode"
+            },
+            "blauberg_s21_schedule_mode_switch": {
+                "name": "Schedule mode"
             }
         }
     },

@@ -26,6 +26,22 @@
         }
     },
     "entity": {
+        "binary_sensor": {
+            "s21_alarm": {
+                "name": "Alarm"
+            },
+            "s21_filter": {
+                "name": "Filter"
+            }
+        },
+        "button": {
+            "blauberg_s21_reset_filter": {
+                "name": "Filter-Timer zurücksetzen"
+            },
+            "blauberg_s21_reset_alarm": {
+                "name": "Alarm-Status zurücksetzen"
+            }
+        },
         "climate": {
             "s21climate": {
                 "state_attributes": {
@@ -37,23 +53,9 @@
                 }
             }
         },
-        "button": {
-            "blauberg_s21_reset_filter": {
-                "name": "Filter-Timer zurücksetzen"
-            },
-            "blauberg_s21_reset_alarm": {
-                "name": "Alarm-Status zurücksetzen"
-            }
-        },
-        "switch": {
-            "blauberg_s21_boost_switch": {
-                "name": "Boost-Modus"
-            },
-            "blauberg_s21_timer_switch": {
-                "name": "Timer-Modus"
-            },
-            "blauberg_s21_schedule_mode_switch": {
-                "name": "Zeitplan-Modus"
+        "number": {
+            "s21manualfanspeed": {
+                "name": "Manuelle Lüftergeschwindigkeit"
             }
         },
         "select": {
@@ -64,11 +66,6 @@
                     "open": "Bypass offen / Rotor gestoppt",
                     "auto": "Automatik-Modus"
                 }
-            }
-        },
-        "number": {
-            "s21manualfanspeed": {
-                "name": "Manuelle Lüftergeschwindigkeit"
             }
         },
         "sensor": {
@@ -101,6 +98,17 @@
             },
             "s21_filter_countdown": {
                 "name": "Restlaufzeit Filter"
+            }
+        },
+        "switch": {
+            "blauberg_s21_boost_switch": {
+                "name": "Boost-Modus"
+            },
+            "blauberg_s21_timer_switch": {
+                "name": "Timer-Modus"
+            },
+            "blauberg_s21_schedule_mode_switch": {
+                "name": "Zeitplan-Modus"
             }
         }
     },

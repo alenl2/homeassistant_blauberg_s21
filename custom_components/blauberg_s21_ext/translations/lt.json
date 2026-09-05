@@ -26,6 +26,22 @@
         }
     },
     "entity": {
+        "binary_sensor": {
+            "s21_alarm": {
+                "name": "Avarija"
+            },
+            "s21_filter": {
+                "name": "Filtras"
+            }
+        },
+        "button": {
+            "blauberg_s21_reset_filter": {
+                "name": "Atstatyti filtro laikmatį"
+            },
+            "blauberg_s21_reset_alarm": {
+                "name": "Atstatyti avarijos būseną"
+            }
+        },
         "climate": {
             "s21climate": {
                 "state_attributes": {
@@ -40,23 +56,9 @@
                 }
             }
         },
-        "button": {
-            "blauberg_s21_reset_filter": {
-                "name": "Atstatyti filtro laikmatį"
-            },
-            "blauberg_s21_reset_alarm": {
-                "name": "Atstatyti avarijos būseną"
-            }
-        },
-        "switch": {
-            "blauberg_s21_boost_switch": {
-                "name": "Intensyvus režimas"
-            },
-            "blauberg_s21_timer_switch": {
-                "name": "Laikmačio režimas"
-            },
-            "blauberg_s21_schedule_mode_switch": {
-                "name": "Grafiko režimas"
+        "number": {
+            "s21manualfanspeed": {
+                "name": "Rankinis ventiliatoriaus greitis"
             }
         },
         "select": {
@@ -67,11 +69,6 @@
                     "open": "Apylanka atidaryta / rotorius sustabdytas",
                     "auto": "Automatinis režimas"
                 }
-            }
-        },
-        "number": {
-            "s21manualfanspeed": {
-                "name": "Rankinis ventiliatoriaus greitis"
             }
         },
         "sensor": {
@@ -104,6 +101,17 @@
             },
             "s21_filter_countdown": {
                 "name": "Filtro likęs laikas"
+            }
+        },
+        "switch": {
+            "blauberg_s21_boost_switch": {
+                "name": "Intensyvus režimas"
+            },
+            "blauberg_s21_timer_switch": {
+                "name": "Laikmačio režimas"
+            },
+            "blauberg_s21_schedule_mode_switch": {
+                "name": "Grafiko režimas"
             }
         }
     },
