@@ -65,6 +65,25 @@
                     "auto": "Automatik-Modus"
                 }
             }
+        },
+        "number": {
+            "s21manualfanspeed": {
+                "name": "Manuelle Lüftergeschwindigkeit"
+            }
+        },
+        "sensor": {
+            "s21_supply_outdoor_temperature": {
+                "name": "Außenlufttemperatur"
+            },
+            "s21_supply_temperature": {
+                "name": "Zulufttemperatur"
+            },
+            "s21_extract_temperature": {
+                "name": "Ablufttemperatur"
+            },
+            "s21_extract_outlet_temperature": {
+                "name": "Fortlufttemperatur"
+            }
         }
     },
     "services": {

@@ -68,6 +68,25 @@
                     "auto": "Automatinis režimas"
                 }
             }
+        },
+        "number": {
+            "s21manualfanspeed": {
+                "name": "Rankinis ventiliatoriaus greitis"
+            }
+        },
+        "sensor": {
+            "s21_supply_outdoor_temperature": {
+                "name": "Lauko oro temperatūra"
+            },
+            "s21_supply_temperature": {
+                "name": "Tiekiamo oro temperatūra"
+            },
+            "s21_extract_temperature": {
+                "name": "Ištraukiamo oro temperatūra"
+            },
+            "s21_extract_outlet_temperature": {
+                "name": "Išmetamo oro temperatūra"
+            }
         }
     },
     "services": {

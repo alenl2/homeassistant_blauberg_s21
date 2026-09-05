@@ -65,6 +65,25 @@
                     "auto": "Automatic mode"
                 }
             }
+        },
+        "number": {
+            "s21manualfanspeed": {
+                "name": "Manual fan speed"
+            }
+        },
+        "sensor": {
+            "s21_supply_outdoor_temperature": {
+                "name": "Supply outdoor temperature"
+            },
+            "s21_supply_temperature": {
+                "name": "Supply temperature"
+            },
+            "s21_extract_temperature": {
+                "name": "Extract temperature"
+            },
+            "s21_extract_outlet_temperature": {
+                "name": "Extract outlet temperature"
+            }
         }
     },
     "services": {

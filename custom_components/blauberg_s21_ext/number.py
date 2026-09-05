@@ -1,13 +1,23 @@
-"""Support for Blauberg S21 manual fan speed control."""
-from typing import Optional
+"""Manual (custom) fan speed control for the Blauberg S21 integration.
+
+Ported from jvitkauskas/homeassistant_blauberg_s21 (Zhevniak Dmytro).
+
+The climate entity's fan modes only write the preset speed register
+(HR_SPEED_MODE), so choosing "custom" put the unit into its manual speed mode
+without any way to say what percentage that should be. This exposes
+HR_ManualSPEED so the percentage can be set directly.
+"""
+from __future__ import annotations
 
 from homeassistant.components.number import NumberEntity, NumberMode
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import PERCENTAGE
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from pybls21.client import S21Client
 
-from .const import DOMAIN
+from . import BlaubergS21Coordinator, get_data
+from .climate import FAN_CUSTOM
+from .entity import BlaubergS21Entity
 
 
 async def async_setup_entry(
@@ -15,55 +25,46 @@ async def async_setup_entry(
     config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up a Blauberg S21 manual fan speed number entity."""
-    client: S21Client = hass.data[DOMAIN][config_entry.entry_id]
-
-    entities = [BlS21ManualFanSpeedNumber(client)]
-    async_add_entities(entities, True)
+    """Set up the Blauberg S21 manual fan speed control."""
+    coordinator = get_data(hass, config_entry).coordinator
+    async_add_entities([BlaubergS21ManualFanSpeedNumber(coordinator)])
 
 
-class BlS21ManualFanSpeedNumber(NumberEntity):
-    """Representation of the Blauberg S21 manual (custom) fan speed percentage.
+class BlaubergS21ManualFanSpeedNumber(BlaubergS21Entity, NumberEntity):
+    """The percentage the unit runs at while its fan mode is "custom".
 
-    Only takes effect while the climate entity's fan_mode is set to
-    "custom" (device fan speed mode 255); otherwise the device is driven
-    by one of its preset speed levels and ignores this value.
+    The value is kept settable regardless of the current fan mode, so it can be
+    dialled in before switching the climate entity over to "custom"; the unit
+    stores it either way and simply ignores it while running a preset speed.
     """
 
     _attr_translation_key = "s21manualfanspeed"
     _attr_native_min_value = 0
     _attr_native_max_value = 100
     _attr_native_step = 1
-    _attr_native_unit_of_measurement = "%"
+    _attr_native_unit_of_measurement = PERCENTAGE
     _attr_mode = NumberMode.SLIDER
     _attr_icon = "mdi:fan-speed-2"
 
-    def __init__(self, client: S21Client) -> None:
-        self._client = client
+    def __init__(self, coordinator: BlaubergS21Coordinator) -> None:
+        super().__init__(coordinator, key="manual_fan_speed")
 
     @property
-    def available(self) -> bool:
-        if self._client.device:
-            return self._client.device.available
-        return False
+    def native_value(self) -> float | None:
+        if (device := self.device) is None:
+            return None
+        return device.manual_fan_speed_percent
 
     @property
-    def name(self) -> Optional[str]:
-        if self._client.device:
-            return f"{self._client.device.name} Manual Fan Speed"
-
-    @property
-    def unique_id(self) -> Optional[str]:
-        if self._client.device:
-            return f"{self._client.device.unique_id}_manual_fan_speed"
-
-    @property
-    def native_value(self) -> Optional[float]:
-        if self._client.device:
-            return self._client.device.manual_fan_speed_percent
+    def extra_state_attributes(self) -> dict[str, bool]:
+        """Flag whether the unit is currently acting on this value."""
+        device = self.device
+        return {
+            "active": bool(device is not None and device.fan_mode == 255),
+            "fan_mode_required": FAN_CUSTOM,
+        }
 
     async def async_set_native_value(self, value: float) -> None:
-        await self._client.set_manual_fan_speed_percent(int(value))
-
-    async def async_update(self) -> None:
-        await self._client.poll()
+        await self._async_call(
+            self.client.set_manual_fan_speed_percent, round(value)
+        )

@@ -42,6 +42,11 @@ REQUIRED_KEYS = (
     "entity.select.blauberg_s21_bypass_mode.state.close",
     "entity.select.blauberg_s21_bypass_mode.state.open",
     "entity.select.blauberg_s21_bypass_mode.state.auto",
+    "entity.number.s21manualfanspeed.name",
+    "entity.sensor.s21_supply_outdoor_temperature.name",
+    "entity.sensor.s21_supply_temperature.name",
+    "entity.sensor.s21_extract_temperature.name",
+    "entity.sensor.s21_extract_outlet_temperature.name",
     "services.reset_filter_change_timer.name",
     "services.reset_filter_change_timer.description",
     "services.reset_alarm.name",
@@ -213,6 +218,48 @@ def test_bypass_select_options_match_the_translations(component_dir):
     for option in BYPASS_MODE_OPTIONS:
         key = f"entity.select.blauberg_s21_bypass_mode.state.{option}"
         assert key in english, f"no translation for bypass option {option!r}"
+
+
+def test_every_sensor_has_a_translated_name(component_dir):
+    """Each sensor description's translation key must exist in every language."""
+    from blauberg_s21_ext.sensor import TEMPERATURE_SENSORS
+
+    for path in LANGUAGE_FILES:
+        flat = flatten(json.loads(path.read_text(encoding="utf-8")))
+        for description in TEMPERATURE_SENSORS:
+            key = f"entity.sensor.{description.translation_key}.name"
+            assert key in flat, f"{path.name} is missing {key}"
+
+
+def test_sensor_keys_are_unique_and_stable(component_dir):
+    """The keys double as unique id suffixes, so they must not change lightly."""
+    from blauberg_s21_ext.sensor import TEMPERATURE_SENSORS
+
+    keys = [description.key for description in TEMPERATURE_SENSORS]
+    assert len(keys) == len(set(keys))
+    assert set(keys) == {
+        "supply_outdoor_temperature",
+        "supply_temperature",
+        "extract_temperature",
+        "extract_outlet_temperature",
+    }
+
+
+def test_every_platform_module_is_registered(component_dir):
+    """A platform file that is not in PLATFORMS would never be set up."""
+    from blauberg_s21_ext import PLATFORMS
+
+    registered = {str(platform) for platform in PLATFORMS}
+    on_disk = {
+        path.stem
+        for path in component_dir.glob("*.py")
+        if path.stem
+        in {"climate", "switch", "button", "select", "sensor", "number", "binary_sensor"}
+    }
+    assert on_disk == registered, (
+        f"platform modules and PLATFORMS disagree: "
+        f"only on disk={on_disk - registered}, only registered={registered - on_disk}"
+    )
 
 
 def test_readme_points_at_the_right_logger(component_dir):

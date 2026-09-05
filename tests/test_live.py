@@ -89,6 +89,31 @@ async def test_poll_returns_plausible_readings(live_client, live_target):
     assert device.timer_countdown.count(":") == 2
 
 
+async def test_poll_reports_all_four_air_stream_temperatures(live_client):
+    """The four readings the temperature sensors are built from."""
+    device = await live_client.poll()
+
+    readings = {
+        "supply outdoor": device.current_intake_temperature,
+        "supply": device.current_intake_temperature_out,
+        "extract": device.current_outlet_temperature_in,
+        "extract outlet": device.current_outlet_temperature_out,
+    }
+    for label, value in readings.items():
+        assert value is not None, f"{label} temperature missing"
+        assert -40 <= value <= 60, f"{label} temperature implausible: {value}"
+
+    # The climate entity mirrors the supply temperature.
+    assert device.current_temperature == device.current_intake_temperature_out
+
+
+async def test_poll_reports_the_manual_fan_speed_percentage(live_client):
+    """The value the manual fan speed slider is built from."""
+    device = await live_client.poll()
+    assert device.manual_fan_speed_percent is not None
+    assert 0 <= device.manual_fan_speed_percent <= 100
+
+
 async def test_poll_is_fast(live_client):
     await live_client.poll()  # warm up
 
@@ -257,6 +282,18 @@ async def test_writing_the_current_boost_state_back_is_accepted(live_client):
         await live_client.set_boost_off()
 
     assert (await live_client.poll()).is_boosting == device.is_boosting
+
+
+@requires_writes
+async def test_writing_the_current_manual_fan_speed_back_is_accepted(live_client):
+    """The register behind the manual fan speed slider."""
+    device = await live_client.poll()
+    current = device.manual_fan_speed_percent
+    assert current is not None
+
+    await live_client.set_manual_fan_speed_percent(int(current))
+
+    assert (await live_client.poll()).manual_fan_speed_percent == current
 
 
 async def test_validation_rejects_bad_values_without_contacting_the_unit(live_client):

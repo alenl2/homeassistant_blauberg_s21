@@ -38,13 +38,23 @@
       }
     },
     "button": {
-      "blauberg_s21_reset_filter": { "name": "Reset filter timer" },
-      "blauberg_s21_reset_alarm": { "name": "Reset alarm" }
+      "blauberg_s21_reset_filter": {
+        "name": "Reset filter timer"
+      },
+      "blauberg_s21_reset_alarm": {
+        "name": "Reset alarm"
+      }
     },
     "switch": {
-      "blauberg_s21_boost_switch": { "name": "Boost mode" },
-      "blauberg_s21_timer_switch": { "name": "Timer mode" },
-      "blauberg_s21_schedule_mode_switch": { "name": "Schedule mode" }
+      "blauberg_s21_boost_switch": {
+        "name": "Boost mode"
+      },
+      "blauberg_s21_timer_switch": {
+        "name": "Timer mode"
+      },
+      "blauberg_s21_schedule_mode_switch": {
+        "name": "Schedule mode"
+      }
     },
     "select": {
       "blauberg_s21_bypass_mode": {
@@ -54,6 +64,25 @@
           "open": "Open bypass / stop rotor",
           "auto": "Automatic"
         }
+      }
+    },
+    "number": {
+      "s21manualfanspeed": {
+        "name": "Manual fan speed"
+      }
+    },
+    "sensor": {
+      "s21_supply_outdoor_temperature": {
+        "name": "Supply outdoor temperature"
+      },
+      "s21_supply_temperature": {
+        "name": "Supply temperature"
+      },
+      "s21_extract_temperature": {
+        "name": "Extract temperature"
+      },
+      "s21_extract_outlet_temperature": {
+        "name": "Extract outlet temperature"
       }
     }
   },

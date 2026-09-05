@@ -108,12 +108,15 @@ def _build() -> None:  # noqa: PLR0915 - one flat builder is easiest to read
     const.CONF_PORT = "port"
     const.EVENT_HOMEASSISTANT_STOP = "homeassistant_stop"
     const.ATTR_TEMPERATURE = "temperature"
+    const.PERCENTAGE = "%"
 
     class Platform:
         CLIMATE = "climate"
         BUTTON = "button"
-        SWITCH = "switch"
+        NUMBER = "number"
         SELECT = "select"
+        SENSOR = "sensor"
+        SWITCH = "switch"
 
     class UnitOfTemperature:
         CELSIUS = "\u00b0C"
@@ -314,6 +317,14 @@ def _build() -> None:  # noqa: PLR0915 - one flat builder is easiest to read
         platform_domain: str = ""
         integration_domain: str = ""
 
+        def _described(self, attribute: str, default: Any = None) -> Any:
+            """Mirror core's `_attr_x` then `entity_description.x` precedence."""
+            if hasattr(self, f"_attr_{attribute}"):
+                return getattr(self, f"_attr_{attribute}")
+            if hasattr(self, "entity_description"):
+                return getattr(self.entity_description, attribute, default)
+            return default
+
         @property
         def should_poll(self) -> bool:
             return True
@@ -338,7 +349,7 @@ def _build() -> None:  # noqa: PLR0915 - one flat builder is easiest to read
 
         @property
         def translation_key(self) -> str | None:
-            return self._attr_translation_key
+            return self._described("translation_key")
 
         @property
         def unique_id(self) -> str | None:
@@ -650,3 +661,133 @@ def _build() -> None:  # noqa: PLR0915 - one flat builder is easiest to read
             raise NotImplementedError
 
     select.SelectEntity = SelectEntity
+
+    # sensor
+    sensor = _module("homeassistant.components.sensor")
+
+    class SensorDeviceClass(str):
+        TEMPERATURE = "temperature"
+        HUMIDITY = "humidity"
+        PRESSURE = "pressure"
+
+    class SensorStateClass(str):
+        MEASUREMENT = "measurement"
+        TOTAL = "total"
+        TOTAL_INCREASING = "total_increasing"
+
+    @dataclass(frozen=True, kw_only=True)
+    class EntityDescription:
+        key: str
+        device_class: Any = None
+        entity_category: Any = None
+        entity_registry_enabled_default: bool = True
+        has_entity_name: bool = False
+        icon: str | None = None
+        name: Any = UNDEFINED
+        translation_key: str | None = None
+        unit_of_measurement: str | None = None
+
+    @dataclass(frozen=True, kw_only=True)
+    class SensorEntityDescription(EntityDescription):
+        native_unit_of_measurement: str | None = None
+        state_class: Any = None
+        suggested_display_precision: int | None = None
+        suggested_unit_of_measurement: str | None = None
+        last_reset: Any = None
+        options: Any = None
+
+    class SensorEntity(Entity):
+        _attr_native_value: Any = None
+
+        @property
+        def device_class(self):
+            return self._described("device_class")
+
+        @property
+        def state_class(self):
+            return self._described("state_class")
+
+        @property
+        def native_unit_of_measurement(self):
+            return self._described("native_unit_of_measurement")
+
+        @property
+        def suggested_display_precision(self):
+            return self._described("suggested_display_precision")
+
+        @property
+        def native_value(self):
+            return self._attr_native_value
+
+        @property
+        def state(self):
+            return self.native_value
+
+    sensor.SensorDeviceClass = SensorDeviceClass
+    sensor.SensorStateClass = SensorStateClass
+    sensor.SensorEntity = SensorEntity
+    sensor.SensorEntityDescription = SensorEntityDescription
+    entity_module.EntityDescription = EntityDescription
+
+    # number
+    number = _module("homeassistant.components.number")
+
+    class NumberMode(str):
+        AUTO = "auto"
+        BOX = "box"
+        SLIDER = "slider"
+
+    @dataclass(frozen=True, kw_only=True)
+    class NumberEntityDescription(EntityDescription):
+        native_max_value: float | None = None
+        native_min_value: float | None = None
+        native_step: float | None = None
+        native_unit_of_measurement: str | None = None
+        mode: Any = None
+
+    class NumberEntity(Entity):
+        _attr_native_value: float | None = None
+        _attr_native_min_value: float = 0
+        _attr_native_max_value: float = 100
+        _attr_native_step: float = 1
+        _attr_mode: Any = NumberMode.AUTO
+
+        @property
+        def native_min_value(self) -> float:
+            return self._described("native_min_value", 0)
+
+        @property
+        def native_max_value(self) -> float:
+            return self._described("native_max_value", 100)
+
+        @property
+        def native_step(self) -> float:
+            return self._described("native_step", 1)
+
+        @property
+        def native_unit_of_measurement(self):
+            return self._described("native_unit_of_measurement")
+
+        @property
+        def mode(self):
+            return self._described("mode")
+
+        @property
+        def native_value(self) -> float | None:
+            return self._attr_native_value
+
+        async def async_set_native_value(self, value: float) -> None:
+            raise NotImplementedError
+
+        async def async_set_value(self, value: float) -> None:
+            """Mirror core's range validation before delegating."""
+            if not self.native_min_value <= value <= self.native_max_value:
+                raise ServiceValidationError(
+                    f"{value} is outside valid range "
+                    f"{self.native_min_value}-{self.native_max_value}"
+                )
+            await self.async_set_native_value(value)
+
+    number.NumberEntity = NumberEntity
+    number.NumberEntityDescription = NumberEntityDescription
+    number.NumberMode = NumberMode

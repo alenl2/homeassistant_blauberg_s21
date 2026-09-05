@@ -32,8 +32,10 @@ FAILURE_GRACE_COUNT = 3
 PLATFORMS: list[Platform] = [
     Platform.CLIMATE,
     Platform.BUTTON,
-    Platform.SWITCH,
+    Platform.NUMBER,
     Platform.SELECT,
+    Platform.SENSOR,
+    Platform.SWITCH,
 ]
 
 

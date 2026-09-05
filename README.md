@@ -16,6 +16,51 @@ It is an extended version of **[jvitkauskas' original development](https://githu
 The major differences include:
 - Expanded attributes: All temperatures, scheduler status, alarm code
 - New control functions: Timer mode, boost mode, alarm reset, bypass/rotor mode
+- Temperature sensors for each of the four air streams, with long-term statistics
+- A slider for the custom (manual) fan speed percentage
+
+
+## Entities
+
+| Entity | Purpose |
+| --- | --- |
+| `climate.<device>` | Power, operating mode, target temperature and fan preset |
+| `number.<device>_manual_fan_speed` | Fan speed percentage used by the "custom" fan mode |
+| `sensor.<device>_outdoor_air_temperature` etc. | The four heat-exchanger temperatures |
+| `switch.<device>_boost_mode` | Boost |
+| `switch.<device>_timer_mode` | Main timer |
+| `switch.<device>_schedule_mode` | Weekly schedule |
+| `select.<device>_bypass_mode` | Bypass / rotor mode (only if the unit has one) |
+| `button.<device>_reset_filter_timer` | Reset the filter countdown |
+| `button.<device>_reset_alarm` | Clear the alarm state |
+
+### Manual (custom) fan speed
+
+The climate entity's fan modes select the unit's **preset** speeds — `low`,
+`medium`, `high` on a 3-speed unit, or the numbered presets on units configured
+for more levels. Choosing `custom` switches the unit into its manual speed mode,
+where it runs at a percentage instead of a preset.
+
+`number.<device>_manual_fan_speed` sets that percentage. It can be adjusted at
+any time; the unit stores the value and simply ignores it while running a preset
+speed. Its `active` attribute tells you whether the unit is currently acting on
+it.
+
+### Temperature sensors
+
+Four sensors expose the heat exchanger's air streams, using the standard
+ventilation naming:
+
+| Sensor | Air stream |
+| --- | --- |
+| Supply outdoor temperature | Outdoor air entering the unit |
+| Supply temperature | Air the unit delivers to the rooms |
+| Extract temperature | Air drawn out of the rooms |
+| Extract outlet temperature | Air the unit exhausts outside |
+
+They carry a device class and state class, so Home Assistant records long-term
+statistics for them. The climate entity's `current_temperature` mirrors the
+supply temperature.
 
 
 ## Installation and Configuration

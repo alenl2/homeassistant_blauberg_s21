@@ -17,6 +17,37 @@ from tests.fake_s21 import Fault
 pytestmark = [pytest.mark.asyncio, requires_hass_stub]
 
 
+def all_platforms():
+    """Every platform module, in the order Home Assistant sets them up."""
+    from blauberg_s21_ext import (
+        button as button_platform,
+    )
+    from blauberg_s21_ext import (
+        climate as climate_platform,
+    )
+    from blauberg_s21_ext import (
+        number as number_platform,
+    )
+    from blauberg_s21_ext import (
+        select as select_platform,
+    )
+    from blauberg_s21_ext import (
+        sensor as sensor_platform,
+    )
+    from blauberg_s21_ext import (
+        switch as switch_platform,
+    )
+
+    return (
+        climate_platform,
+        switch_platform,
+        button_platform,
+        select_platform,
+        sensor_platform,
+        number_platform,
+    )
+
+
 # ---------------------------------------------------------------- helpers
 async def setup_integration(hass, entry):
     """Run async_setup_entry the way Home Assistant would."""
@@ -66,7 +97,14 @@ async def test_setup_stores_runtime_data_and_forwards_platforms(loaded):
 
     forwarded = hass.config_entries.forwarded
     assert len(forwarded) == 1
-    assert set(forwarded[0][1]) == {"climate", "button", "switch", "select"}
+    assert set(forwarded[0][1]) == {
+        "climate",
+        "button",
+        "number",
+        "select",
+        "sensor",
+        "switch",
+    }
 
 
 async def test_unload_closes_the_socket_and_cleans_up(
@@ -270,12 +308,11 @@ async def test_device_reachable_tracks_the_failure_count(loaded, fake_server):
 
 # ------------------------------------------------------------- unique ids
 async def test_entity_unique_ids_are_unchanged(loaded, add_entities):
-    """Existing installations must not get a second set of entities."""
-    from blauberg_s21_ext import button as button_platform
-    from blauberg_s21_ext import climate as climate_platform
-    from blauberg_s21_ext import select as select_platform
-    from blauberg_s21_ext import switch as switch_platform
+    """Existing installations must not get a second set of entities.
 
+    The ids for the ported number and sensor entities deliberately match the
+    ones the upstream implementations produced, for the same reason.
+    """
     hass, entry, _data = loaded
     base = entry.unique_id
 
@@ -287,15 +324,15 @@ async def test_entity_unique_ids_are_unchanged(loaded, add_entities):
         f"{base}_reset_filter_button",
         f"{base}_reset_alarm_button",
         f"blauberg_s21_{base}_bypass_mode",
+        f"{base}_manual_fan_speed",
+        f"{base}_supply_outdoor_temperature",
+        f"{base}_supply_temperature",
+        f"{base}_extract_temperature",
+        f"{base}_extract_outlet_temperature",
     }
 
     entities = []
-    for platform in (
-        climate_platform,
-        switch_platform,
-        button_platform,
-        select_platform,
-    ):
+    for platform in all_platforms():
         entities.extend(await add_entities(platform, hass, entry))
 
     found = {entity.unique_id for entity in entities}
@@ -304,21 +341,12 @@ async def test_entity_unique_ids_are_unchanged(loaded, add_entities):
 
 
 async def test_all_entities_belong_to_one_device(loaded, add_entities):
-    from blauberg_s21_ext import button as button_platform
-    from blauberg_s21_ext import climate as climate_platform
-    from blauberg_s21_ext import select as select_platform
-    from blauberg_s21_ext import switch as switch_platform
     from blauberg_s21_ext.const import DOMAIN
 
     hass, entry, _data = loaded
 
     entities = []
-    for platform in (
-        climate_platform,
-        switch_platform,
-        button_platform,
-        select_platform,
-    ):
+    for platform in all_platforms():
         entities.extend(await add_entities(platform, hass, entry))
 
     identifiers = {
@@ -334,10 +362,7 @@ async def test_all_entities_belong_to_one_device(loaded, add_entities):
 
 async def test_entity_names_come_from_the_translations(loaded, add_entities):
     """`has_entity_name` plus a translation key, not a hardcoded _attr_name."""
-    from blauberg_s21_ext import button as button_platform
     from blauberg_s21_ext import climate as climate_platform
-    from blauberg_s21_ext import select as select_platform
-    from blauberg_s21_ext import switch as switch_platform
     from homeassistant.helpers.entity import UNDEFINED
 
     hass, entry, _data = loaded
@@ -348,9 +373,12 @@ async def test_entity_names_come_from_the_translations(loaded, add_entities):
     assert climate.name is None
 
     others = []
-    for platform in (switch_platform, button_platform, select_platform):
+    for platform in all_platforms():
+        if platform is climate_platform:
+            continue
         others.extend(await add_entities(platform, hass, entry))
 
+    assert len(others) == 11
     for entity in others:
         assert entity.has_entity_name is True
         assert entity.translation_key is not None
@@ -809,6 +837,203 @@ async def test_bypass_select_is_not_created_without_a_bypass(
         assert await add_entities(select_platform, hass_stub_hass, entry) == []
     finally:
         await teardown_integration(hass_stub_hass, entry)
+
+
+# ------------------------------------------------------- temperature sensors
+async def test_temperature_sensors_are_created(loaded, add_entities):
+    from blauberg_s21_ext import sensor as sensor_platform
+
+    hass, entry, _data = loaded
+    sensors = await add_entities(sensor_platform, hass, entry)
+
+    assert len(sensors) == 4
+    assert {sensor.entity_description.key for sensor in sensors} == {
+        "supply_outdoor_temperature",
+        "supply_temperature",
+        "extract_temperature",
+        "extract_outlet_temperature",
+    }
+
+
+async def test_temperature_sensors_map_to_the_right_registers(loaded, add_entities):
+    """The upstream commit targeted a pybls21 with different property names.
+
+    Each sensor must land on the register it is named after; getting these
+    crossed would silently report the wrong air stream.
+    """
+    from blauberg_s21_ext import sensor as sensor_platform
+
+    hass, entry, data = loaded
+    fake = None  # values come from the fake server's defaults
+
+    sensors = {
+        sensor.entity_description.key: sensor
+        for sensor in await add_entities(sensor_platform, hass, entry)
+    }
+    del fake
+
+    # Fake server defaults: SuAirIn 21.0, SuAirOut 23.2, ExAirIn 22.0, ExAirOut 15.0
+    assert sensors["supply_outdoor_temperature"].native_value == 21.0
+    assert sensors["supply_temperature"].native_value == 23.2
+    assert sensors["extract_temperature"].native_value == 22.0
+    assert sensors["extract_outlet_temperature"].native_value == 15.0
+
+    # And they must track the device, not a snapshot.
+    assert data.coordinator.data is not None
+
+
+@pytest.mark.parametrize(
+    ("key", "register", "raw", "expected"),
+    [
+        ("supply_outdoor_temperature", 1, 55, 5.5),
+        ("supply_temperature", 2, 201, 20.1),
+        ("extract_temperature", 3, 0x10000 - 35, -3.5),
+        ("extract_outlet_temperature", 4, 0x10000 - 155, -15.5),
+    ],
+)
+async def test_temperature_sensors_follow_their_register(
+    loaded, fake_server, add_entities, key, register, raw, expected
+):
+    from blauberg_s21_ext import sensor as sensor_platform
+
+    hass, entry, data = loaded
+    sensors = {
+        sensor.entity_description.key: sensor
+        for sensor in await add_entities(sensor_platform, hass, entry)
+    }
+
+    fake_server.inputs[register] = raw
+    await data.coordinator.async_refresh()
+    assert sensors[key].native_value == expected
+
+
+async def test_temperature_sensors_are_statistics_ready(loaded, add_entities):
+    """device_class plus state_class is what gives long-term statistics."""
+    from blauberg_s21_ext import sensor as sensor_platform
+
+    hass, entry, _data = loaded
+
+    for sensor in await add_entities(sensor_platform, hass, entry):
+        assert sensor.device_class == "temperature"
+        assert sensor.state_class == "measurement"
+        assert sensor.native_unit_of_measurement == "\u00b0C"
+        assert sensor.suggested_display_precision == 1
+
+
+async def test_temperature_sensors_go_unavailable_with_the_device(
+    loaded, fake_server, add_entities
+):
+    from blauberg_s21_ext import sensor as sensor_platform
+
+    hass, entry, data = loaded
+    sensors = await add_entities(sensor_platform, hass, entry)
+    assert all(sensor.available for sensor in sensors)
+
+    fake_server.fault = Fault.REFUSE_CONNECTIONS
+    for _ in range(4):
+        await data.coordinator.async_refresh()
+    assert not any(sensor.available for sensor in sensors)
+
+
+# ----------------------------------------------------- manual fan speed slider
+async def test_manual_fan_speed_number_is_a_percentage_slider(loaded, add_entities):
+    from blauberg_s21_ext import number as number_platform
+
+    hass, entry, _data = loaded
+    numbers = await add_entities(number_platform, hass, entry)
+
+    assert len(numbers) == 1
+    slider = numbers[0]
+    assert slider.mode == "slider"
+    assert (slider.native_min_value, slider.native_max_value) == (0, 100)
+    assert slider.native_step == 1
+    assert slider.native_unit_of_measurement == "%"
+    # Fake server default for HR_ManualSPEED
+    assert slider.native_value == 50
+
+
+async def test_manual_fan_speed_writes_the_register(loaded, fake_server, add_entities):
+    from blauberg_s21_ext import number as number_platform
+
+    hass, entry, _data = loaded
+    slider = (await add_entities(number_platform, hass, entry))[0]
+
+    fake_server.writes.clear()
+    await slider.async_set_native_value(75)
+
+    assert ("register", 17, 75) in fake_server.writes
+    assert slider.native_value == 75
+
+
+@pytest.mark.parametrize(
+    ("requested", "written"),
+    [(0, 0), (100, 100), (33.4, 33), (33.6, 34), (99.5, 100)],
+)
+async def test_manual_fan_speed_rounds_rather_than_truncates(
+    loaded, fake_server, add_entities, requested, written
+):
+    from blauberg_s21_ext import number as number_platform
+
+    hass, entry, _data = loaded
+    slider = (await add_entities(number_platform, hass, entry))[0]
+
+    fake_server.writes.clear()
+    await slider.async_set_native_value(requested)
+    assert ("register", 17, written) in fake_server.writes
+
+
+@pytest.mark.parametrize("value", [-1, 101, 250])
+async def test_manual_fan_speed_rejects_out_of_range_values(
+    loaded, fake_server, add_entities, value
+):
+    """Home Assistant range-checks before calling us; the client also validates."""
+    from blauberg_s21_ext import number as number_platform
+    from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+
+    hass, entry, _data = loaded
+    slider = (await add_entities(number_platform, hass, entry))[0]
+
+    fake_server.writes.clear()
+    with pytest.raises((ServiceValidationError, HomeAssistantError)):
+        await slider.async_set_value(value)
+    assert fake_server.writes == [], "nothing should reach the device"
+
+
+async def test_manual_fan_speed_reports_whether_it_is_in_effect(
+    loaded, fake_server, add_entities
+):
+    """The value only drives the unit while the fan mode is custom (255)."""
+    from blauberg_s21_ext import number as number_platform
+
+    hass, entry, data = loaded
+    slider = (await add_entities(number_platform, hass, entry))[0]
+
+    assert slider.extra_state_attributes["active"] is False
+    assert slider.extra_state_attributes["fan_mode_required"] == "custom"
+
+    fake_server.holding[2] = 255  # HR_SPEED_MODE -> manual
+    await data.coordinator.async_refresh()
+    assert slider.extra_state_attributes["active"] is True
+
+
+async def test_manual_fan_speed_survives_a_custom_mode_round_trip(
+    loaded, fake_server, add_entities
+):
+    """Setting the climate fan mode to custom must not clear the percentage."""
+    from blauberg_s21_ext import climate as climate_platform
+    from blauberg_s21_ext import number as number_platform
+
+    hass, entry, data = loaded
+    slider = (await add_entities(number_platform, hass, entry))[0]
+    climate = (await add_entities(climate_platform, hass, entry))[0]
+
+    await slider.async_set_native_value(42)
+    await climate.async_set_fan_mode("custom")
+    await data.coordinator.async_refresh()
+
+    assert climate.fan_mode == "custom"
+    assert slider.native_value == 42
+    assert slider.extra_state_attributes["active"] is True
 
 
 # ------------------------------------------------------------- config flow
