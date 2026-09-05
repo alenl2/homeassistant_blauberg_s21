@@ -127,6 +127,40 @@ def test_hacs_manifest_is_valid(component_dir):
     assert hacs["name"]
 
 
+def test_brand_assets_exist(component_dir):
+    """HACS's brands check needs a local icon for a non-core domain.
+
+    The fallback is the domain's entry in home-assistant/brands, and
+    blauberg_s21_ext is not there, so this directory is the only thing that
+    satisfies the check.
+    """
+    brand = component_dir / "brand"
+    assert (brand / "icon.png").is_file(), "HACS requires brand/icon.png"
+    assert (brand / "logo.png").is_file()
+
+
+def test_hacs_workflow_only_ignores_presentation_checks():
+    """Guard against quietly suppressing a check that reflects real breakage.
+
+    The two ignored checks are about GitHub repository settings; everything HACS
+    validates about the integration itself must stay enforced.
+    """
+    workflow = yaml.safe_load(
+        (REPO_ROOT / ".github" / "workflows" / "hacs.yaml").read_text(encoding="utf-8")
+    )
+    step = next(
+        s
+        for s in workflow["jobs"]["hacs"]["steps"]
+        if str(s.get("uses", "")).startswith("hacs/action")
+    )
+    assert step["with"]["category"] == "integration"
+
+    ignored = set(str(step["with"].get("ignore", "")).split())
+    assert ignored <= {"issues", "topics"}, (
+        f"unexpected HACS checks ignored: {sorted(ignored - {'issues', 'topics'})}"
+    )
+
+
 # --------------------------------------------------------------------- services
 def test_services_are_targetable(services):
     """Without a target block the UI offers no entity picker."""

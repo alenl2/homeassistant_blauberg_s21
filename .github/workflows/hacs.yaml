@@ -5,6 +5,9 @@ on:
   pull_request:
   schedule:
     - cron: "0 0 * * *"
+  workflow_dispatch:
+
+permissions: {}
 
 jobs:
   hacs:
@@ -15,3 +18,16 @@ jobs:
         uses: "hacs/action@main"
         with:
           category: "integration"
+          # Two of HACS's checks are about how the repository is presented on
+          # GitHub rather than anything in the integration:
+          #
+          #   issues  requires the issue tracker to be enabled here, but this is
+          #           a fork and manifest.json deliberately points its
+          #           issue_tracker at the upstream repository, which is where
+          #           bug reports belong.
+          #   topics  requires GitHub topics, which only matter for a repository
+          #           being submitted to the HACS default list.
+          #
+          # Remove this line if the repository is ever submitted to
+          # https://github.com/hacs/default, where both checks are mandatory.
+          ignore: issues topics
