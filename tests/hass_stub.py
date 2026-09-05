@@ -109,6 +109,26 @@ def _build() -> None:  # noqa: PLR0915 - one flat builder is easiest to read
     const.EVENT_HOMEASSISTANT_STOP = "homeassistant_stop"
     const.ATTR_TEMPERATURE = "temperature"
     const.PERCENTAGE = "%"
+    const.REVOLUTIONS_PER_MINUTE = "rpm"
+
+    class UnitOfPressure:
+        PA = "Pa"
+        HPA = "hPa"
+        BAR = "bar"
+
+    class UnitOfTime:
+        SECONDS = "s"
+        MINUTES = "min"
+        HOURS = "h"
+        DAYS = "d"
+
+    class EntityCategory:
+        CONFIG = "config"
+        DIAGNOSTIC = "diagnostic"
+
+    const.UnitOfPressure = UnitOfPressure
+    const.UnitOfTime = UnitOfTime
+    const.EntityCategory = EntityCategory
 
     class Platform:
         CLIMATE = "climate"
@@ -301,11 +321,17 @@ def _build() -> None:  # noqa: PLR0915 - one flat builder is easiest to read
 
     class Entity:
         # These are annotations without defaults on purpose - see module docstring.
+        # Core declares them this way so that hasattr() is False unless a
+        # subclass sets them, which is what lets entity_description supply the
+        # value instead. Giving them defaults here would silently mask both the
+        # translation lookup and every entity_description field.
         _attr_name: str | None
-        _attr_has_entity_name: bool = False
-        _attr_translation_key: str | None = None
+        _attr_icon: str | None
+        _attr_translation_key: str | None
+        _attr_entity_category: Any
+        _attr_has_entity_name: bool
+        # These do have defaults in core.
         _attr_unique_id: str | None = None
-        _attr_icon: str | None = None
         _attr_device_info: Any = None
         _attr_supported_features: Any = None
 
@@ -331,7 +357,7 @@ def _build() -> None:  # noqa: PLR0915 - one flat builder is easiest to read
 
         @property
         def has_entity_name(self) -> bool:
-            return self._attr_has_entity_name
+            return self._described("has_entity_name", False)
 
         @property
         def name(self):
@@ -357,7 +383,11 @@ def _build() -> None:  # noqa: PLR0915 - one flat builder is easiest to read
 
         @property
         def icon(self) -> str | None:
-            return self._attr_icon
+            return self._described("icon")
+
+        @property
+        def entity_category(self):
+            return self._described("entity_category")
 
         @property
         def device_info(self) -> Any:
@@ -669,6 +699,10 @@ def _build() -> None:  # noqa: PLR0915 - one flat builder is easiest to read
         TEMPERATURE = "temperature"
         HUMIDITY = "humidity"
         PRESSURE = "pressure"
+        DURATION = "duration"
+        FREQUENCY = "frequency"
+        POWER = "power"
+        ENERGY = "energy"
 
     class SensorStateClass(str):
         MEASUREMENT = "measurement"

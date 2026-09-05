@@ -83,6 +83,24 @@
             },
             "s21_extract_outlet_temperature": {
                 "name": "Fortlufttemperatur"
+            },
+            "s21_humidity": {
+                "name": "Luftfeuchtigkeit"
+            },
+            "s21_supply_fan_speed": {
+                "name": "Zuluftventilator-Drehzahl"
+            },
+            "s21_extract_fan_speed": {
+                "name": "Abluftventilator-Drehzahl"
+            },
+            "s21_supply_pressure": {
+                "name": "Zuluftdruck"
+            },
+            "s21_extract_pressure": {
+                "name": "Abluftdruck"
+            },
+            "s21_filter_countdown": {
+                "name": "Restlaufzeit Filter"
             }
         }
     },

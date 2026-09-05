@@ -83,6 +83,24 @@
       },
       "s21_extract_outlet_temperature": {
         "name": "Extract outlet temperature"
+      },
+      "s21_humidity": {
+        "name": "Humidity"
+      },
+      "s21_supply_fan_speed": {
+        "name": "Supply fan speed"
+      },
+      "s21_extract_fan_speed": {
+        "name": "Extract fan speed"
+      },
+      "s21_supply_pressure": {
+        "name": "Supply air pressure"
+      },
+      "s21_extract_pressure": {
+        "name": "Extract air pressure"
+      },
+      "s21_filter_countdown": {
+        "name": "Filter time remaining"
       }
     }
   },

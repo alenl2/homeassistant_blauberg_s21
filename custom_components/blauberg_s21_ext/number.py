@@ -44,7 +44,9 @@ class BlaubergS21ManualFanSpeedNumber(BlaubergS21Entity, NumberEntity):
     _attr_native_step = 1
     _attr_native_unit_of_measurement = PERCENTAGE
     _attr_mode = NumberMode.SLIDER
-    _attr_icon = "mdi:fan-speed-2"
+    # Not mdi:fan-speed-N: those denote the unit's discrete preset levels, which
+    # is exactly what this control is not.
+    _attr_icon = "mdi:speedometer"
 
     def __init__(self, coordinator: BlaubergS21Coordinator) -> None:
         super().__init__(coordinator, key="manual_fan_speed")

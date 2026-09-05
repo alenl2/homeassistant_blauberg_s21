@@ -86,6 +86,24 @@
             },
             "s21_extract_outlet_temperature": {
                 "name": "Išmetamo oro temperatūra"
+            },
+            "s21_humidity": {
+                "name": "Oro drėgnumas"
+            },
+            "s21_supply_fan_speed": {
+                "name": "Tiekiamo oro ventiliatoriaus greitis"
+            },
+            "s21_extract_fan_speed": {
+                "name": "Ištraukiamo oro ventiliatoriaus greitis"
+            },
+            "s21_supply_pressure": {
+                "name": "Tiekiamo oro slėgis"
+            },
+            "s21_extract_pressure": {
+                "name": "Ištraukiamo oro slėgis"
+            },
+            "s21_filter_countdown": {
+                "name": "Filtro likęs laikas"
             }
         }
     },

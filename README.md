@@ -26,13 +26,19 @@ The major differences include:
 | --- | --- |
 | `climate.<device>` | Power, operating mode, target temperature and fan preset |
 | `number.<device>_manual_fan_speed` | Fan speed percentage used by the "custom" fan mode |
-| `sensor.<device>_outdoor_air_temperature` etc. | The four heat-exchanger temperatures |
+| `sensor.<device>_supply_temperature` etc. | The four heat-exchanger temperatures |
+| `sensor.<device>_humidity` | Extract air humidity, if the unit has the sensor |
+| `sensor.<device>_supply_fan_speed` | Fan speeds, air pressures and the filter countdown |
 | `switch.<device>_boost_mode` | Boost |
 | `switch.<device>_timer_mode` | Main timer |
 | `switch.<device>_schedule_mode` | Weekly schedule |
 | `select.<device>_bypass_mode` | Bypass / rotor mode (only if the unit has one) |
 | `button.<device>_reset_filter_timer` | Reset the filter countdown |
 | `button.<device>_reset_alarm` | Clear the alarm state |
+
+Entities that describe how the unit is running rather than what it is doing —
+fan speeds, air pressures and the filter countdown — are in Home Assistant's
+diagnostic category, so they stay out of the way on the device page.
 
 ### Manual (custom) fan speed
 
@@ -46,7 +52,7 @@ any time; the unit stores the value and simply ignores it while running a preset
 speed. Its `active` attribute tells you whether the unit is currently acting on
 it.
 
-### Temperature sensors
+### Sensors
 
 Four sensors expose the heat exchanger's air streams, using the standard
 ventilation naming:
@@ -58,9 +64,18 @@ ventilation naming:
 | Extract temperature | Air drawn out of the rooms |
 | Extract outlet temperature | Air the unit exhausts outside |
 
-They carry a device class and state class, so Home Assistant records long-term
-statistics for them. The climate entity's `current_temperature` mirrors the
-supply temperature.
+Alongside them: extract air humidity, both fan speeds in rpm, both air pressures
+and the number of days left on the filter timer.
+
+All of them carry a state class, so Home Assistant records long-term statistics.
+The climate entity's `current_temperature` mirrors the supply temperature.
+
+A few notes on hardware that is not always fitted:
+
+- The humidity sensor entity is only created if the unit reports a reading.
+- The air pressure sensors read a constant `0` unless the optional pressure
+  sensors are installed. Pascals is assumed, as the conventional unit for
+  ventilation static pressure; the registers themselves do not state a unit.
 
 
 ## Installation and Configuration

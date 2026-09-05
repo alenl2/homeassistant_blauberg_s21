@@ -329,6 +329,12 @@ async def test_entity_unique_ids_are_unchanged(loaded, add_entities):
         f"{base}_supply_temperature",
         f"{base}_extract_temperature",
         f"{base}_extract_outlet_temperature",
+        f"{base}_humidity",
+        f"{base}_supply_fan_speed",
+        f"{base}_extract_fan_speed",
+        f"{base}_supply_pressure",
+        f"{base}_extract_pressure",
+        f"{base}_filter_countdown",
     }
 
     entities = []
@@ -378,7 +384,7 @@ async def test_entity_names_come_from_the_translations(loaded, add_entities):
             continue
         others.extend(await add_entities(platform, hass, entry))
 
-    assert len(others) == 11
+    assert len(others) == 17
     for entity in others:
         assert entity.has_entity_name is True
         assert entity.translation_key is not None
@@ -845,14 +851,14 @@ async def test_temperature_sensors_are_created(loaded, add_entities):
 
     hass, entry, _data = loaded
     sensors = await add_entities(sensor_platform, hass, entry)
+    keys = {sensor.entity_description.key for sensor in sensors}
 
-    assert len(sensors) == 4
-    assert {sensor.entity_description.key for sensor in sensors} == {
+    assert {
         "supply_outdoor_temperature",
         "supply_temperature",
         "extract_temperature",
         "extract_outlet_temperature",
-    }
+    } <= keys
 
 
 async def test_temperature_sensors_map_to_the_right_registers(loaded, add_entities):
@@ -910,14 +916,142 @@ async def test_temperature_sensors_follow_their_register(
 async def test_temperature_sensors_are_statistics_ready(loaded, add_entities):
     """device_class plus state_class is what gives long-term statistics."""
     from blauberg_s21_ext import sensor as sensor_platform
+    from blauberg_s21_ext.sensor import TEMPERATURE_SENSORS
 
     hass, entry, _data = loaded
+    temperature_keys = {d.key for d in TEMPERATURE_SENSORS}
 
     for sensor in await add_entities(sensor_platform, hass, entry):
+        if sensor.entity_description.key not in temperature_keys:
+            continue
         assert sensor.device_class == "temperature"
         assert sensor.state_class == "measurement"
         assert sensor.native_unit_of_measurement == "\u00b0C"
         assert sensor.suggested_display_precision == 1
+        assert sensor.entity_category is None, "temperatures are not diagnostics"
+
+
+async def test_every_sensor_records_statistics(loaded, add_entities):
+    from blauberg_s21_ext import sensor as sensor_platform
+
+    hass, entry, _data = loaded
+    for sensor in await add_entities(sensor_platform, hass, entry):
+        assert sensor.state_class == "measurement", sensor.entity_description.key
+        assert sensor.native_unit_of_measurement, sensor.entity_description.key
+
+
+@pytest.mark.parametrize(
+    ("key", "expected", "unit", "device_class", "diagnostic"),
+    [
+        ("humidity", 45, "%", "humidity", False),
+        ("supply_fan_speed", 2460, "rpm", None, True),
+        ("extract_fan_speed", 2520, "rpm", None, True),
+        ("supply_pressure", 0, "Pa", "pressure", True),
+        ("extract_pressure", 0, "Pa", "pressure", True),
+        ("filter_countdown", 90, "d", "duration", True),
+    ],
+)
+async def test_non_temperature_sensors(
+    loaded, add_entities, key, expected, unit, device_class, diagnostic
+):
+    from blauberg_s21_ext import sensor as sensor_platform
+
+    hass, entry, _data = loaded
+    sensors = {
+        sensor.entity_description.key: sensor
+        for sensor in await add_entities(sensor_platform, hass, entry)
+    }
+
+    sensor = sensors[key]
+    assert sensor.native_value == expected
+    assert sensor.native_unit_of_measurement == unit
+    assert sensor.device_class == device_class
+    assert (sensor.entity_category == "diagnostic") is diagnostic
+
+
+@pytest.mark.parametrize(
+    ("key", "register", "raw", "expected"),
+    [
+        ("humidity", 10, 61, 61),
+        ("supply_fan_speed", 23, 1200, 1200),
+        ("extract_fan_speed", 24, 1310, 1310),
+        ("supply_pressure", 21, 145, 145),
+        ("extract_pressure", 22, 132, 132),
+        ("filter_countdown", 28, 7, 7),
+    ],
+)
+async def test_non_temperature_sensors_follow_their_register(
+    loaded, fake_server, add_entities, key, register, raw, expected
+):
+    from blauberg_s21_ext import sensor as sensor_platform
+
+    hass, entry, data = loaded
+    sensors = {
+        sensor.entity_description.key: sensor
+        for sensor in await add_entities(sensor_platform, hass, entry)
+    }
+
+    fake_server.inputs[register] = raw
+    await data.coordinator.async_refresh()
+    assert sensors[key].native_value == expected
+
+
+async def test_humidity_sensor_is_skipped_when_no_sensor_is_fitted(
+    hass_stub_hass, config_entry_factory, fake_server, add_entities
+):
+    """The client reports None when the register reads zero, meaning no sensor."""
+    from blauberg_s21_ext import sensor as sensor_platform
+
+    fake_server.inputs[10] = 0  # IR_CurRH_Int
+    host, port = fake_server.address
+    entry = config_entry_factory(host, port)
+    await setup_integration(hass_stub_hass, entry)
+    try:
+        keys = {
+            sensor.entity_description.key
+            for sensor in await add_entities(sensor_platform, hass_stub_hass, entry)
+        }
+        assert "humidity" not in keys
+        # ...but everything else is still there.
+        assert "supply_temperature" in keys
+        assert "filter_countdown" in keys
+    finally:
+        await teardown_integration(hass_stub_hass, entry)
+
+
+async def test_all_sensors_have_distinct_keys_and_translation_keys():
+    from blauberg_s21_ext.sensor import SENSORS
+
+    keys = [description.key for description in SENSORS]
+    translation_keys = [description.translation_key for description in SENSORS]
+    assert len(keys) == len(set(keys))
+    assert len(translation_keys) == len(set(translation_keys))
+    assert len(SENSORS) == 10
+
+
+async def test_sensors_without_a_device_class_carry_an_icon(loaded, add_entities):
+    """A device class supplies an icon; anything else needs one of its own."""
+    from blauberg_s21_ext import sensor as sensor_platform
+
+    hass, entry, _data = loaded
+    for sensor in await add_entities(sensor_platform, hass, entry):
+        if sensor.device_class is None:
+            assert sensor.icon, (
+                f"{sensor.entity_description.key} has neither a device class "
+                f"nor an icon"
+            )
+
+
+async def test_filter_countdown_keeps_its_filter_icon(loaded, add_entities):
+    from blauberg_s21_ext import sensor as sensor_platform
+
+    hass, entry, _data = loaded
+    sensors = {
+        sensor.entity_description.key: sensor
+        for sensor in await add_entities(sensor_platform, hass, entry)
+    }
+    assert sensors["filter_countdown"].icon == "mdi:air-filter"
+    assert sensors["supply_fan_speed"].icon == "mdi:fan"
 
 
 async def test_temperature_sensors_go_unavailable_with_the_device(
@@ -950,6 +1084,8 @@ async def test_manual_fan_speed_number_is_a_percentage_slider(loaded, add_entiti
     assert slider.native_unit_of_measurement == "%"
     # Fake server default for HR_ManualSPEED
     assert slider.native_value == 50
+    # mdi:fan-speed-N denotes the discrete presets, which is what this is not.
+    assert slider.icon == "mdi:speedometer"
 
 
 async def test_manual_fan_speed_writes_the_register(loaded, fake_server, add_entities):
