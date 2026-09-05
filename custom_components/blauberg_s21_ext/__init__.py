@@ -8,6 +8,7 @@ from datetime import timedelta
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PORT, EVENT_HOMEASSISTANT_STOP, Platform
 from homeassistant.core import Event, HomeAssistant, callback
+from homeassistant.exceptions import ConfigEntryError
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import DOMAIN
@@ -72,9 +73,14 @@ class BlaubergS21Coordinator(DataUpdateCoordinator):
     async def _async_update_data(self) -> ClimateDevice:
         try:
             device = await self.client.poll()
-        except UnsupportedDeviceException:
-            # Not recoverable by retrying - let it bubble up as a hard error.
-            raise
+        except UnsupportedDeviceException as err:
+            # Permanent condition. ConfigEntryError tells Home Assistant to stop
+            # and show the problem, instead of retrying forever as it would for
+            # ConfigEntryNotReady.
+            raise ConfigEntryError(
+                f"The device at {self.client.host}:{self.client.port} does not "
+                f"look like a Blauberg S21: {err}"
+            ) from err
         except Exception as err:
             self._consecutive_failures += 1
             raise UpdateFailed(
