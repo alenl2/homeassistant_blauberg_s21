@@ -1,0 +1,31 @@
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "-ra --strict-markers"
+markers = [
+    "live: requires a real Blauberg S21 (set BLAUBERG_S21_HOST)",
+    "slow: takes more than a few seconds",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "I", "UP", "SIM", "RET", "C4"]
+ignore = [
+    "E501",    # line length is handled by the formatter
+    "F403",    # the vendored client uses a star import of its constants
+    "F405",
+    "UP006",   # keep typing.List/Optional in the vendored client
+    "UP035",
+    "UP045",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/hass_stub.py" = ["B008", "SIM102"]
+# The vendored client mirrors upstream pybls21; keep its public types as-is so
+# the diff against upstream stays readable.
+"custom_components/blauberg_s21_ext/pybls21/*" = ["UP042"]
