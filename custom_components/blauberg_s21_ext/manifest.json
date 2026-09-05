@@ -8,6 +8,7 @@
   "integration_type": "device",
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/marni-xyz/homeassistant_blauberg_s21/issues",
-  "requirements": ["pybls21@git+https://github.com/marni-xyz/pybls21.git@v.4.6.1"],
-  "version": "4.6.1"
+  "loggers": ["custom_components.blauberg_s21_ext"],
+  "requirements": ["pymodbus>=3.6.0,<4.0"],
+  "version": "4.7.0"
 }

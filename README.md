@@ -49,7 +49,7 @@ Make sure to include debug logs. See https://www.home-assistant.io/integrations/
 logger:
   default: info
   logs:
-    custom_components.blauberg_21_ext: debug
+    custom_components.blauberg_s21_ext: debug
 ```
 
 ## Contributions are welcome!
@@ -59,7 +59,23 @@ If you want to contribute to this please read the [Contribution guidelines](CONT
 
 ## Dependency
 
-This component is built on top of the [underlying pybls21 library](https://github.com/marni-xyz/pybls21)
+The Modbus client ([pybls21](https://github.com/marni-xyz/pybls21)) is vendored
+into this component under `custom_components/blauberg_s21_ext/pybls21/`, so the
+only external requirement is `pymodbus`.
+
+### Notes on the Modbus connection
+
+The S21 accepts **exactly one** TCP connection at a time and answers any further
+connection attempt with a TCP reset. This component therefore holds the socket
+only for the duration of a single read or write and closes it again immediately,
+which keeps the unit reachable for other clients such as the vendor app.
+
+If a client stops using its socket without closing it, the unit keeps that single
+slot reserved for as long as the socket stays open — which can lock everything
+else out long after the client is gone. The component therefore closes the socket
+on `EVENT_HOMEASSISTANT_STOP` (Home Assistant does not unload integrations on
+shutdown, so this has to be done explicitly), and it rides out short outages
+instead of immediately flagging the entities unavailable.
 
 ---
 

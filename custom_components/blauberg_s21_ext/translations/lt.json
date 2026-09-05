@@ -1,7 +1,9 @@
 {
     "config": {
         "abort": {
-            "already_configured": "Įrenginys jau sukonfigūruotas"
+            "already_configured": "Įrenginys jau sukonfigūruotas",
+            "reconfigure_successful": "Perkonfigūravimas sėkmingas",
+            "wrong_device": "Tai kitas Blauberg S21 nei jau sukonfigūruotas."
         },
         "error": {
             "cannot_connect": "Nepavyko prisijungti",
@@ -10,6 +12,12 @@
         },
         "step": {
             "user": {
+                "data": {
+                    "host": "Adresas",
+                    "port": "Prievadas"
+                }
+            },
+            "reconfigure": {
                 "data": {
                     "host": "Adresas",
                     "port": "Prievadas"
@@ -31,6 +39,45 @@
                     }
                 }
             }
+        },
+        "button": {
+            "blauberg_s21_reset_filter": {
+                "name": "Atstatyti filtro laikmatį"
+            },
+            "blauberg_s21_reset_alarm": {
+                "name": "Atstatyti avarijos būseną"
+            }
+        },
+        "switch": {
+            "blauberg_s21_boost_switch": {
+                "name": "Intensyvus režimas"
+            },
+            "blauberg_s21_timer_switch": {
+                "name": "Laikmačio režimas"
+            },
+            "blauberg_s21_schedule_mode_switch": {
+                "name": "Grafiko režimas"
+            }
+        },
+        "select": {
+            "blauberg_s21_bypass_mode": {
+                "name": "Apylankos režimas",
+                "state": {
+                    "close": "Apylanka uždaryta / rotorius paleistas",
+                    "open": "Apylanka atidaryta / rotorius sustabdytas",
+                    "auto": "Automatinis režimas"
+                }
+            }
+        }
+    },
+    "services": {
+        "reset_filter_change_timer": {
+            "name": "Atstatyti filtro keitimo laikmatį",
+            "description": "Atstato filtro keitimo atbulinį laikmatį."
+        },
+        "reset_alarm": {
+            "name": "Atstatyti avariją",
+            "description": "Atstato dabartinę avarijos būseną."
         }
     }
 }

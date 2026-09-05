@@ -1,6 +1,7 @@
 """Support for climate device."""
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from homeassistant.components.climate import (
@@ -10,26 +11,25 @@ from homeassistant.components.climate import (
     HVACMode,
 )
 from homeassistant.components.climate.const import (
-    # MaNi additions - additional attributes
-    FAN_OFF,
-    # EO MaNi additions - additional attributes
     FAN_HIGH,
     FAN_LOW,
     FAN_MEDIUM,
+    FAN_OFF,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_TEMPERATURE, UnitOfTemperature
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
-# MaNi additions - register additional methods
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import entity_platform
-# EO MaNi additions - register additional methods
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from pybls21.client import S21Client
-from pybls21.models import HVACAction as BlS21HVACAction
-from pybls21.models import HVACMode as BlS21HVACMode
+from . import BlaubergS21Coordinator, get_data
 from .const import DOMAIN
+from .entity import BlaubergS21Entity
+from .pybls21.models import HVACAction as BlS21HVACAction
+from .pybls21.models import HVACMode as BlS21HVACMode
+
+_LOGGER = logging.getLogger(__name__)
 
 HA_TO_S21_HVACMODE = {
     HVACMode.OFF: BlS21HVACMode.OFF,
@@ -49,10 +49,30 @@ S21_TO_HA_HVACACTION = {
     BlS21HVACAction.OFF: HVACAction.OFF,
 }
 
-# MaNi additions - additional attributes
-#S21_TO_HA_FAN_MODE = {1: FAN_LOW, 2: FAN_MEDIUM, 3: FAN_HIGH, 255: "custom"}
-S21_TO_HA_FAN_MODE = {0: FAN_OFF, 1: FAN_LOW, 2: FAN_MEDIUM, 3: FAN_HIGH, 255: "custom"}
-# EO MaNi additions - additional attributes
+FAN_CUSTOM = "custom"
+
+# Only the named speeds are mapped; anything else is surfaced as its raw level
+# so that devices with a max_fan_level other than 3 still work.
+S21_TO_HA_FAN_MODE = {
+    0: FAN_OFF,
+    1: FAN_LOW,
+    2: FAN_MEDIUM,
+    3: FAN_HIGH,
+    255: FAN_CUSTOM,
+}
+HA_TO_S21_FAN_MODE = {v: k for k, v in S21_TO_HA_FAN_MODE.items()}
+
+
+def _fan_level_to_ha(level: int | None, max_fan_level: int | None) -> str | None:
+    """Translate a raw device fan level into a Home Assistant fan mode."""
+    if level is None:
+        return None
+    # The friendly low/medium/high labels only make sense on a 3-speed unit.
+    if max_fan_level == 3 or level in (0, 255):
+        mapped = S21_TO_HA_FAN_MODE.get(level)
+        if mapped is not None:
+            return mapped
+    return str(level)
 
 
 async def async_setup_entry(
@@ -61,254 +81,221 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up a Blauberg S21 climate entity."""
-    client: S21Client = hass.data[DOMAIN][config_entry.entry_id]
+    coordinator = get_data(hass, config_entry).coordinator
 
-    entities = [BlS21ClimateEntity(client, config_entry)]
-    async_add_entities(entities, True)
-    
-    # MaNi additions - register additional methods
+    async_add_entities([BlS21ClimateEntity(coordinator)])
+
     platform = entity_platform.async_get_current_platform()
     platform.async_register_entity_service(
         "reset_filter_change_timer",
-        {},
+        None,
         "async_reset_filter_change_timer",
     )
     platform.async_register_entity_service(
         "reset_alarm",
-        {},
+        None,
         "async_reset_alarm",
     )
-    # EO MaNi additions - register additional methods
 
 
-class BlS21ClimateEntity(ClimateEntity):
+class BlS21ClimateEntity(BlaubergS21Entity, ClimateEntity):
     """Representation of a Blauberg S21 climate feature."""
 
+    _attr_name = None
     _attr_translation_key = "s21climate"
+    _attr_temperature_unit = UnitOfTemperature.CELSIUS
+    _attr_supported_features = (
+        ClimateEntityFeature.TARGET_TEMPERATURE
+        | ClimateEntityFeature.FAN_MODE
+        | ClimateEntityFeature.TURN_OFF
+        | ClimateEntityFeature.TURN_ON
+    )
 
-    def __init__(self, client: S21Client, config_entry: ConfigEntry) -> None:
-        self._client = client
-        self._config_entry = config_entry
-
-    @property
-    def available(self) -> bool:
-        if self._client.device:
-            return self._client.device.available
-        return False
-
-    @property
-    def name(self) -> str | None:
-        if self._client.device:
-            return self._client.device.name
+    def __init__(self, coordinator: BlaubergS21Coordinator) -> None:
+        super().__init__(coordinator, key=None)
 
     @property
-    def unique_id(self) -> str | None:
-        if self._config_entry.unique_id:
-            return self._config_entry.unique_id
-        if self._client.device:
-            return self._client.device.unique_id
-
-    @property
-    def temperature_unit(self) -> str:
-        return UnitOfTemperature.CELSIUS
-
-    @property
-    def precision(self) -> float | None:
-        if self._client.device:
-            return self._client.device.precision
+    def precision(self) -> float:
+        if (device := self.device) is not None and device.precision:
+            return device.precision
+        return 1.0
 
     @property
     def current_temperature(self) -> float | None:
-        if self._client.device:
-            return self._client.device.current_temperature
+        return self.device.current_temperature if self.device else None
 
     @property
     def target_temperature(self) -> float | None:
-        if self._client.device:
-            return self._client.device.target_temperature
+        return self.device.target_temperature if self.device else None
 
     @property
-    def target_temperature_step(self) -> float | None:
-        if self._client.device:
-            return self._client.device.target_temperature_step
+    def target_temperature_step(self) -> float:
+        if (device := self.device) is not None and device.target_temperature_step:
+            return device.target_temperature_step
+        return 1.0
 
     @property
-    def max_temp(self) -> float | None:
-        if self._client.device:
-            return self._client.device.max_temp
+    def max_temp(self) -> float:
+        if (device := self.device) is not None and device.max_temp is not None:
+            return device.max_temp
+        return 30.0
 
     @property
-    def min_temp(self) -> float | None:
-        if self._client.device:
-            return self._client.device.min_temp
+    def min_temp(self) -> float:
+        if (device := self.device) is not None and device.min_temp is not None:
+            return device.min_temp
+        return 15.0
 
     @property
     def current_humidity(self) -> float | None:
-        if self._client.device:
-            return self._client.device.current_humidity
+        return self.device.current_humidity if self.device else None
 
     @property
     def hvac_mode(self) -> HVACMode | None:
-        if self._client.device:
-            return S21_TO_HA_HVACMODE.get(self._client.device.hvac_mode)
+        if (device := self.device) is None:
+            return None
+        return S21_TO_HA_HVACMODE.get(device.hvac_mode)
 
     @property
     def hvac_action(self) -> HVACAction | None:
-        if self._client.device:
-            return S21_TO_HA_HVACACTION.get(self._client.device.hvac_action)
+        if (device := self.device) is None:
+            return None
+        return S21_TO_HA_HVACACTION.get(device.hvac_action)
 
     @property
-    def hvac_modes(self) -> list[HVACMode] | None:
-        if self._client.device:
-            return [
-                S21_TO_HA_HVACMODE[m]
-                for m in self._client.device.hvac_modes
-                if m in S21_TO_HA_HVACMODE
-            ]
+    def hvac_modes(self) -> list[HVACMode]:
+        if (device := self.device) is None:
+            return []
+        return [
+            S21_TO_HA_HVACMODE[mode]
+            for mode in device.hvac_modes
+            if mode in S21_TO_HA_HVACMODE
+        ]
 
     @property
     def fan_mode(self) -> str | None:
-        if self._client.device:
-            if self._client.device.max_fan_level == 3:
-                return S21_TO_HA_FAN_MODE.get(
-                    self._client.device.fan_mode, str(self._client.device.fan_mode)
-                )
-            return str(self._client.device.fan_mode)
-
-    @property
-    def fan_modes(self) -> list[str] | None:
-        if self._client.device:
-            if self._client.device.max_fan_level == 3:
-                return [S21_TO_HA_FAN_MODE.get(m, str(m)) for m in self._client.device.fan_modes]
-            return [str(m) for m in self._client.device.fan_modes]
-
-    @property
-    def supported_features(self) -> ClimateEntityFeature:
-        # MaNi additions - additional attributes
-        #return ClimateEntityFeature.TARGET_TEMPERATURE | ClimateEntityFeature.FAN_MODE
-        return ClimateEntityFeature.TARGET_TEMPERATURE | ClimateEntityFeature.FAN_MODE | ClimateEntityFeature.TURN_OFF | ClimateEntityFeature.TURN_ON
-        # EO MaNi additions - additional attributes
-    
-    @property
-    def device_info(self) -> DeviceInfo | None:
-        """Return information used by Home Assistant to register the device."""
-        unique_id = self.unique_id
-        if not unique_id:
+        if (device := self.device) is None:
             return None
+        return _fan_level_to_ha(device.fan_mode, device.max_fan_level)
 
-        name = self._config_entry.title
-        manufacturer = None
-        model = None
-        sw_version = None
+    @property
+    def fan_modes(self) -> list[str]:
+        if (device := self.device) is None or not device.fan_modes:
+            return []
+        return [
+            _fan_level_to_ha(level, device.max_fan_level) or str(level)
+            for level in device.fan_modes
+        ]
 
-        if self._client.device:
-            name = self._client.device.name or name
-            manufacturer = self._client.device.manufacturer
-            model = self._client.device.model
-            sw_version = self._client.device.sw_version
-
-        return DeviceInfo(
-            identifiers={(DOMAIN, unique_id)},
-            name=name,
-            manufacturer=manufacturer,
-            model=model,
-            sw_version=sw_version,
-        )
-
-    # MaNi additions - additional attributes
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return additional state attributes."""
-        if not self._client.device:
+        if (device := self.device) is None:
             return {}
         return {
-            "current_intake_temperature_in": self._client.device.current_intake_temperature,
-            "current_intake_temperature_out": self._client.device.current_intake_temperature_out,
-            "current_outlet_temperature_in": self._client.device.current_outlet_temperature_in,
-            "current_outlet_temperature_out": self._client.device.current_outlet_temperature_out,
-            "alarm_state": self._client.device.alarm_state,
-            "alarm_codes": self._client.device.alarm_codes,
-            "bypass_type": self._client.device.bypass_type,
-            "bypass_mode": self._client.device.bypass_mode,
-            "filter_state": self._client.device.filter_state,
-            "filter_countdown": self._client.device.filter_countdown,
-            "pressure_air_incoming": self._client.device.pressure_air_incoming,
-            "pressure_air_outgoing": self._client.device.pressure_air_outgoing,
-            "is_boosting": self._client.device.is_boosting,
-            "is_timer": self._client.device.is_timer,
-            "timer_countdown": self._client.device.timer_countdown,
-            "is_schedule_mode": self._client.device.is_schedule_mode,
-            "fan_level_schedule_mode": S21_TO_HA_FAN_MODE.get(self._client.device.fan_level_schedule_mode, str(self._client.device.fan_level_schedule_mode) ),
-            "fan_level_manual_mode": S21_TO_HA_FAN_MODE.get(self._client.device.fan_level_manual_mode, str(self._client.device.fan_level_manual_mode) ),
+            "current_intake_temperature_in": device.current_intake_temperature,
+            "current_intake_temperature_out": device.current_intake_temperature_out,
+            "current_outlet_temperature_in": device.current_outlet_temperature_in,
+            "current_outlet_temperature_out": device.current_outlet_temperature_out,
+            "alarm_state": device.alarm_state,
+            "alarm_codes": device.alarm_codes,
+            "bypass_type": device.bypass_type,
+            "bypass_mode": device.bypass_mode,
+            "filter_state": device.filter_state,
+            "filter_countdown": device.filter_countdown,
+            "pressure_air_incoming": device.pressure_air_incoming,
+            "pressure_air_outgoing": device.pressure_air_outgoing,
+            "supply_fan_speed": device.supply_fan_speed,
+            "extract_fan_speed": device.extract_fan_speed,
+            "manual_fan_speed_percent": device.manual_fan_speed_percent,
+            "max_fan_level": device.max_fan_level,
+            "is_boosting": device.is_boosting,
+            "is_timer": device.is_timer,
+            "timer_countdown": device.timer_countdown,
+            "is_schedule_mode": device.is_schedule_mode,
+            "fan_level_schedule_mode": _fan_level_to_ha(
+                device.fan_level_schedule_mode, device.max_fan_level
+            ),
+            "fan_level_manual_mode": _fan_level_to_ha(
+                device.fan_level_manual_mode, device.max_fan_level
+            ),
         }
-    # EO MaNi additions - additional attributes
 
     @property
     def icon(self) -> str | None:
-        if self._client.device:
-            if not self._client.device.available:
-                return "mdi:lan-disconnect"
-            if self._client.device.is_boosting:
-                return "mdi:fan-plus"
-            if self._client.device.hvac_action == BlS21HVACAction.OFF:
-                return "mdi:fan-off"
-            if self._client.device.hvac_action == BlS21HVACAction.IDLE:
-                return "mdi:fan-remove"
-            if self._client.device.max_fan_level == 3:
-                if self._client.device.fan_mode == 1:
-                    return "mdi:fan-speed-1"
-                if self._client.device.fan_mode == 2:
-                    return "mdi:fan-speed-2"
-                if self._client.device.fan_mode == 3:
-                    return "mdi:fan-speed-3"
-            if self._client.device.hvac_action == BlS21HVACAction.COOLING:
-                return "mdi:fan-chevron-down"
-            if self._client.device.hvac_action == BlS21HVACAction.HEATING:
-                return "mdi:fan-chevron-up"
-            if self._client.device.hvac_action == BlS21HVACAction.FAN:
-                return "mdi:fan"
+        if (device := self.device) is None or not self.available:
+            return "mdi:lan-disconnect"
+        if device.is_boosting:
+            return "mdi:fan-plus"
+        if device.hvac_action == BlS21HVACAction.OFF:
+            return "mdi:fan-off"
+        if device.hvac_action == BlS21HVACAction.IDLE:
+            return "mdi:fan-remove"
+        if device.max_fan_level == 3:
+            if device.fan_mode == 1:
+                return "mdi:fan-speed-1"
+            if device.fan_mode == 2:
+                return "mdi:fan-speed-2"
+            if device.fan_mode == 3:
+                return "mdi:fan-speed-3"
+        if device.hvac_action == BlS21HVACAction.COOLING:
+            return "mdi:fan-chevron-down"
+        if device.hvac_action == BlS21HVACAction.HEATING:
+            return "mdi:fan-chevron-up"
         return "mdi:fan"
-
-    async def async_set_bypass_mode(self, mode: int) -> None:
-        await self._client.set_bypass_mode(mode)
-        await self._client.poll()
-        self.async_write_ha_state()
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         if hvac_mode not in HA_TO_S21_HVACMODE:
-            return
-        await self._client.set_hvac_mode(HA_TO_S21_HVACMODE[hvac_mode])
+            raise ServiceValidationError(f"Unsupported hvac mode: {hvac_mode}")
+        await self._async_call(
+            self.client.set_hvac_mode, HA_TO_S21_HVACMODE[hvac_mode]
+        )
+
+    async def async_turn_on(self) -> None:
+        """Power the unit on without changing its operating mode.
+
+        ClimateEntity's fallback would pick HVACMode.HEAT and force the heater
+        on, so drive the power coil directly instead.
+        """
+        await self._async_call(self.client.turn_on)
+
+    async def async_turn_off(self) -> None:
+        """Power the unit off."""
+        await self._async_call(self.client.turn_off)
 
     async def async_set_fan_mode(self, fan_mode: str) -> None:
+        device = self.device
+        max_fan_level = device.max_fan_level if device else None
+
+        level = HA_TO_S21_FAN_MODE.get(fan_mode)
+        if level is None:
+            try:
+                level = int(fan_mode)
+            except (TypeError, ValueError) as err:
+                raise ServiceValidationError(
+                    f"Unsupported fan mode: {fan_mode}"
+                ) from err
+        if level == 0:
+            # "off" is not a settable speed on this unit; power it off instead.
+            await self.async_turn_off()
+            return
+
         previous_fan_mode = self.fan_mode
-        int_fan_mode = (
-            255
-            if fan_mode == "custom"
-            else 1
-            if fan_mode == FAN_LOW
-            else 2
-            if fan_mode == FAN_MEDIUM
-            else 3
-            if fan_mode == FAN_HIGH
-            else int(fan_mode)
-        )
-        await self._client.set_fan_mode(int_fan_mode, 3)
-        await self._client.poll()
-        self.async_write_ha_state()
+        await self._async_call(self.client.set_fan_mode, level, max_fan_level)
 
         current_fan_mode = self.fan_mode
         if (
-            self.hass
-            and self.entity_id
-            and previous_fan_mode is not None
+            previous_fan_mode is not None
             and current_fan_mode is not None
             and previous_fan_mode != current_fan_mode
         ):
             self.hass.bus.async_fire(
                 "logbook_entry",
                 {
-                    "name": self.name or self._config_entry.title,
-                    "message": f"Fan mode changed: {previous_fan_mode} -> {current_fan_mode}",
+                    "name": self.device_name,
+                    "message": (
+                        f"Fan mode changed: {previous_fan_mode} -> {current_fan_mode}"
+                    ),
                     "entity_id": self.entity_id,
                     "domain": DOMAIN,
                 },
@@ -316,14 +303,18 @@ class BlS21ClimateEntity(ClimateEntity):
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
         temperature = kwargs.get(ATTR_TEMPERATURE)
-        if temperature is not None:
-            await self._client.set_temperature(int(temperature))
+        if temperature is None:
+            return
+        target = round(float(temperature))
+        if not self.min_temp <= target <= self.max_temp:
+            raise ServiceValidationError(
+                f"Temperature {target} °C is outside the supported range "
+                f"{self.min_temp:.0f}-{self.max_temp:.0f} °C"
+            )
+        await self._async_call(self.client.set_temperature, target)
 
     async def async_reset_filter_change_timer(self) -> None:
-        await self._client.reset_filter_change_timer()
+        await self._async_call(self.client.reset_filter_change_timer)
 
     async def async_reset_alarm(self) -> None:
-        await self._client.reset_alarm()
-
-    async def async_update(self) -> None:
-        await self._client.poll()
+        await self._async_call(self.client.reset_alarm)

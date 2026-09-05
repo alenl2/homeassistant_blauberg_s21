@@ -1,12 +1,13 @@
+"""Button entities for the Blauberg S21 integration."""
 from __future__ import annotations
+
 from homeassistant.components.button import ButtonEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from pybls21.client import S21Client
-from .const import DOMAIN
+from . import BlaubergS21Coordinator, get_data
+from .entity import BlaubergS21Entity
 
 
 async def async_setup_entry(
@@ -14,48 +15,37 @@ async def async_setup_entry(
     config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    client: S21Client = hass.data[DOMAIN][config_entry.entry_id]
-    async_add_entities([
-        BlaubergS21ResetFilterButton(client, config_entry),
-        BlaubergS21ResetAlarmButton(client, config_entry),
-    ])
+    """Set up the Blauberg S21 buttons."""
+    coordinator = get_data(hass, config_entry).coordinator
+    async_add_entities(
+        [
+            BlaubergS21ResetFilterButton(coordinator),
+            BlaubergS21ResetAlarmButton(coordinator),
+        ]
+    )
 
 
-class BlaubergS21ResetFilterButton(ButtonEntity):
+class BlaubergS21ResetFilterButton(BlaubergS21Entity, ButtonEntity):
+    """Reset the filter replacement countdown."""
+
     _attr_icon = "mdi:filter-remove"
     _attr_translation_key = "blauberg_s21_reset_filter"
-    _attr_name = "Reset Filter"
 
-    def __init__(self, client: S21Client, config_entry: ConfigEntry) -> None:
-        self._client = client
-        self._config_entry = config_entry
-        self._attr_unique_id = f"{config_entry.unique_id}_reset_filter_button"
+    def __init__(self, coordinator: BlaubergS21Coordinator) -> None:
+        super().__init__(coordinator, key="reset_filter_button")
 
     async def async_press(self) -> None:
-        await self._client.reset_filter_change_timer()
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        return DeviceInfo(
-            identifiers={(DOMAIN, self._config_entry.unique_id)},
-        )
+        await self._async_call(self.client.reset_filter_change_timer)
 
 
-class BlaubergS21ResetAlarmButton(ButtonEntity):
+class BlaubergS21ResetAlarmButton(BlaubergS21Entity, ButtonEntity):
+    """Reset the current alarm state."""
+
     _attr_icon = "mdi:alarm-off"
     _attr_translation_key = "blauberg_s21_reset_alarm"
-    _attr_name = "Reset Alarm"
 
-    def __init__(self, client: S21Client, config_entry: ConfigEntry) -> None:
-        self._client = client
-        self._config_entry = config_entry
-        self._attr_unique_id = f"{config_entry.unique_id}_reset_alarm_button"
+    def __init__(self, coordinator: BlaubergS21Coordinator) -> None:
+        super().__init__(coordinator, key="reset_alarm_button")
 
     async def async_press(self) -> None:
-        await self._client.reset_alarm()
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        return DeviceInfo(
-            identifiers={(DOMAIN, self._config_entry.unique_id)},
-        )
+        await self._async_call(self.client.reset_alarm)

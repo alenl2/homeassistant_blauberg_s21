@@ -1,7 +1,9 @@
 {
     "config": {
         "abort": {
-            "already_configured": "Device is already configured"
+            "already_configured": "Device is already configured",
+            "reconfigure_successful": "Reconfiguration was successful",
+            "wrong_device": "This is a different Blauberg S21 than the one already configured."
         },
         "error": {
             "cannot_connect": "Failed to connect",
@@ -10,6 +12,12 @@
         },
         "step": {
             "user": {
+                "data": {
+                    "host": "Host",
+                    "port": "Port"
+                }
+            },
+            "reconfigure": {
                 "data": {
                     "host": "Host",
                     "port": "Port"
@@ -39,24 +47,34 @@
         },
         "switch": {
             "blauberg_s21_boost_switch": {
-                "name": "Boost Mode-Switch"
+                "name": "Boost mode"
             },
             "blauberg_s21_timer_switch": {
-                "name": "Timer Mode-Switch"
+                "name": "Timer mode"
             },
             "blauberg_s21_schedule_mode_switch": {
-                "name": "Schedule Mode-Switch"
+                "name": "Schedule mode"
             }
         },
         "select": {
             "blauberg_s21_bypass_mode": {
-                "name": "Bypass Mode-Selection",
+                "name": "Bypass mode",
                 "state": {
                     "close": "Bypass closed / rotor started",
                     "open": "Bypass opened / rotor stopped",
                     "auto": "Automatic mode"
                 }
             }
+        }
+    },
+    "services": {
+        "reset_filter_change_timer": {
+            "name": "Reset timer for filter change",
+            "description": "Resets the countdown timer for filter replacement."
+        },
+        "reset_alarm": {
+            "name": "Reset alarm",
+            "description": "Resets the current alarm state."
         }
     }
 }

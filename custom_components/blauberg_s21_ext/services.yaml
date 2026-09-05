@@ -1,7 +1,15 @@
 reset_filter_change_timer:
   name: Reset timer for filter change
   description: Resets the countdown timer for filter replacement.
+  target:
+    entity:
+      integration: blauberg_s21_ext
+      domain: climate
 
 reset_alarm:
   name: Reset alarm
   description: Resets the current alarm state.
+  target:
+    entity:
+      integration: blauberg_s21_ext
+      domain: climate

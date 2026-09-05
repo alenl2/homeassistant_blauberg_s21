@@ -1,7 +1,9 @@
 {
     "config": {
         "abort": {
-            "already_configured": "Gerät ist bereits konfiguriert"
+            "already_configured": "Gerät ist bereits konfiguriert",
+            "reconfigure_successful": "Neukonfiguration war erfolgreich",
+            "wrong_device": "Dies ist ein anderes Blauberg S21 als das bereits konfigurierte."
         },
         "error": {
             "cannot_connect": "Verbindung fehlgeschlagen",
@@ -10,6 +12,12 @@
         },
         "step": {
             "user": {
+                "data": {
+                    "host": "Host",
+                    "port": "Port"
+                }
+            },
+            "reconfigure": {
                 "data": {
                     "host": "Host",
                     "port": "Port"
@@ -31,7 +39,7 @@
         },
         "button": {
             "blauberg_s21_reset_filter": {
-                "name": "Filter Timer zurücksetzen"
+                "name": "Filter-Timer zurücksetzen"
             },
             "blauberg_s21_reset_alarm": {
                 "name": "Alarm-Status zurücksetzen"
@@ -39,24 +47,34 @@
         },
         "switch": {
             "blauberg_s21_boost_switch": {
-                "name": "Boost Modus-Schalter"
+                "name": "Boost-Modus"
             },
             "blauberg_s21_timer_switch": {
-                "name": "Timer Modus-Schalter"
+                "name": "Timer-Modus"
             },
             "blauberg_s21_schedule_mode_switch": {
-                "name": "Schedule Modus-Schalter"
+                "name": "Zeitplan-Modus"
             }
         },
         "select": {
             "blauberg_s21_bypass_mode": {
-                "name": "Bypass Modus-Auswahl",
+                "name": "Bypass-Modus",
                 "state": {
                     "close": "Bypass geschlossen / Rotor gestartet",
-                    "open":  "Bypass offen / Rotor gestoppt",
-                    "auto":  "Automatik Modus"
+                    "open": "Bypass offen / Rotor gestoppt",
+                    "auto": "Automatik-Modus"
                 }
             }
+        }
+    },
+    "services": {
+        "reset_filter_change_timer": {
+            "name": "Timer für Filterwechsel zurücksetzen",
+            "description": "Setzt den Countdown-Timer für den Filterwechsel zurück."
+        },
+        "reset_alarm": {
+            "name": "Alarm zurücksetzen",
+            "description": "Setzt den aktuellen Alarmzustand zurück."
         }
     }
 }

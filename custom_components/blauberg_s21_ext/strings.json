@@ -6,6 +6,12 @@
           "host": "[%key:common::config_flow::data::host%]",
           "port": "[%key:common::config_flow::data::port%]"
         }
+      },
+      "reconfigure": {
+        "data": {
+          "host": "[%key:common::config_flow::data::host%]",
+          "port": "[%key:common::config_flow::data::port%]"
+        }
       }
     },
     "error": {
@@ -14,7 +20,9 @@
       "unsupported_device": "Unsupported device"
     },
     "abort": {
-      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
+      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]",
+      "reconfigure_successful": "[%key:common::config_flow::abort::reconfigure_successful%]",
+      "wrong_device": "This is a different Blauberg S21 than the one already configured."
     }
   },
   "entity": {
@@ -31,19 +39,19 @@
     },
     "button": {
       "blauberg_s21_reset_filter": { "name": "Reset filter timer" },
-      "blauberg_s21_reset_alarm":  { "name": "Reset alarm" }
+      "blauberg_s21_reset_alarm": { "name": "Reset alarm" }
     },
     "switch": {
-      "blauberg_s21_boost_switch": { "name": "Boost Mode-Switch" },
-      "blauberg_s21_timer_switch": { "name": "Timer Mode-Switch" },
-      "blauberg_s21_schedule_mode_switch": { "name": "Schedule Mode-Switch" }
+      "blauberg_s21_boost_switch": { "name": "Boost mode" },
+      "blauberg_s21_timer_switch": { "name": "Timer mode" },
+      "blauberg_s21_schedule_mode_switch": { "name": "Schedule mode" }
     },
     "select": {
       "blauberg_s21_bypass_mode": {
         "name": "Bypass mode",
         "state": {
-          "close": "Close bypass / Start rotor",
-          "open": "Open bypass / Stop rotor",
+          "close": "Close bypass / start rotor",
+          "open": "Open bypass / stop rotor",
           "auto": "Automatic"
         }
       }
